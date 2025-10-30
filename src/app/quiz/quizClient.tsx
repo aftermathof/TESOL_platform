@@ -70,7 +70,9 @@ export function QuizClient({ quiz }: { quiz: Quiz }) {
           />
         ))}
         <div className="flex items-center justify-between">
+          <span>
 
+          </span>
           <button
             type="submit"
             className="inline-flex items-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"

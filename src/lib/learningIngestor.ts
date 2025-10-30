@@ -1,0 +1,330 @@
+import { requestBaiduOcr } from "@/lib/ocr/baiduClient";
+import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
+
+export type IngestLearningDocumentOptions = {
+  moduleId: string;
+  baseTitle: string;
+  fileUrl: string;
+  pageRange?: [number, number];
+};
+
+export type IngestLearningDocumentResult = {
+  sourceKey: string;
+  modules: Array<{ id: string; title: string; sectionCount: number }>;
+  totalSections: number;
+  ocrConfidence: number;
+  pages: number[];
+  usedFallback: boolean;
+};
+
+function buildCacheKey(fileUrl: string, pageRange?: [number, number]) {
+  return `${fileUrl}::${pageRange ? pageRange.join("-") : "all"}`;
+}
+
+export async function ingestLearningDocument(
+  options: IngestLearningDocumentOptions
+): Promise<IngestLearningDocumentResult> {
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    throw new Error(
+      "Supabase service role 未配置，无法执行写操作。请在 .env.local 中设置 SUPABASE_SERVICE_ROLE_KEY。"
+    );
+  }
+
+  const cacheKey = buildCacheKey(options.fileUrl, options.pageRange);
+
+  const { data: cached } = await supabase
+    .from("learning_ocr_cache")
+    .select("text, confidence, pages")
+    .eq("cache_key", cacheKey)
+    .maybeSingle();
+
+  let ocrResult =
+    cached != null
+      ? {
+          text: String(cached.text ?? ""),
+          confidence: Number(cached.confidence ?? 1),
+          pages: Array.isArray(cached.pages) ? (cached.pages as number[]) : [],
+        }
+      : null;
+
+  if (ocrResult && ocrResult.text.trim().length < 24) {
+    ocrResult = null;
+  }
+
+  if (!ocrResult) {
+    ocrResult = await requestBaiduOcr({
+      fileUrl: options.fileUrl,
+      pageRange: options.pageRange,
+    });
+
+    const { error: cacheError } = await supabase
+      .from("learning_ocr_cache")
+      .upsert(
+        {
+          cache_key: cacheKey,
+          module_id: options.moduleId,
+          file_url: options.fileUrl,
+          page_start: options.pageRange ? options.pageRange[0] : null,
+          page_end: options.pageRange ? options.pageRange[1] : null,
+          text: ocrResult.text,
+          confidence: ocrResult.confidence,
+          pages: ocrResult.pages,
+        },
+        { onConflict: "cache_key" }
+      );
+
+    if (cacheError) {
+      console.warn("[learningIngestor] failed to cache OCR result:", cacheError);
+    }
+  }
+
+  const modules = buildModulesFromOcrText(ocrResult.text, options.baseTitle);
+  if (modules.length === 0) {
+    throw new Error("未能生成有效的学习模块，请检查 OCR 识别结果后重试。");
+  }
+
+  const { error: removeError } = await supabase
+    .from("learning_modules")
+    .delete()
+    .eq("source_key", options.moduleId);
+
+  if (removeError) {
+    throw removeError;
+  }
+
+  const insertedModules: Array<{ id: string; title: string; sectionCount: number }> = [];
+  let totalSections = 0;
+
+  for (const [index, module] of modules.entries()) {
+    const { data: moduleInsert, error: moduleInsertError } = await supabase
+      .from("learning_modules")
+      .insert({
+        source_key: options.moduleId,
+        title: module.title,
+        description: module.summary ?? null,
+        order_index: index,
+      })
+      .select("id")
+      .single();
+
+    if (moduleInsertError || !moduleInsert) {
+      throw moduleInsertError ?? new Error("无法写入学习模块记录。");
+    }
+
+    const sectionsPayload = module.sections.map((section, sectionIndex) => ({
+      module_id: moduleInsert.id,
+      title: section.title,
+      order_index: sectionIndex,
+      duration_minutes: null,
+      content: section.content,
+      summary: section.summary ?? null,
+    }));
+
+    if (sectionsPayload.length > 0) {
+      const { error: sectionError } = await supabase
+        .from("module_sections")
+        .insert(sectionsPayload);
+      if (sectionError) {
+        throw sectionError;
+      }
+    }
+
+    insertedModules.push({
+      id: moduleInsert.id,
+      title: module.title,
+      sectionCount: sectionsPayload.length,
+    });
+    totalSections += sectionsPayload.length;
+  }
+
+  return {
+    sourceKey: options.moduleId,
+    modules: insertedModules,
+    totalSections,
+    ocrConfidence: ocrResult.confidence,
+    pages: ocrResult.pages,
+    usedFallback: true,
+  };
+}
+
+type DraftModule = {
+  title: string;
+  summary?: string | null;
+  sections: Array<{
+    title: string;
+    content: string;
+    summary?: string | null;
+  }>;
+};
+
+export function buildModulesFromOcrText(text: string, baseTitle?: string): DraftModule[] {
+  const normalised = text.replace(/\r/g, "").trim();
+  if (!normalised) {
+    return [];
+  }
+
+  const headings = extractHeadingSegments(normalised);
+  if (headings.length > 0) {
+    const segmentMap = splitByHeadingSegments(normalised, headings);
+
+    return headings.map((heading, index) => {
+      const content =
+        segmentMap.get(heading.title) ??
+        buildPlaceholderContent(heading.title, index + 1);
+      const summary =
+        content.split("\n").find((line) => line.trim().length > 0)?.trim() ?? null;
+
+      return {
+        title: heading.title,
+        summary,
+        sections: [
+          {
+            title: heading.title,
+            content,
+            summary,
+          },
+        ],
+      };
+    });
+  }
+
+  return buildFallbackModules(normalised, baseTitle);
+}
+
+type HeadingSegment = {
+  title: string;
+  index: number;
+};
+
+function extractHeadingSegments(text: string): HeadingSegment[] {
+  const headings: HeadingSegment[] = [];
+
+  const contentsIndex = text.toLowerCase().indexOf("contents");
+  const searchScope =
+    contentsIndex >= 0
+      ? text.slice(contentsIndex, contentsIndex + 2000)
+      : text.slice(0, 2000);
+
+  const headingPattern = /^(\d+)\s+([^\d][^\n]+)$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = headingPattern.exec(searchScope))) {
+    const rawTitle = match[2].trim();
+    if (!rawTitle) continue;
+
+    const escaped = escapeForRegex(rawTitle);
+    const searchRegex = new RegExp(
+      `(?:^|\\n)${escaped.replace(/\s+/g, "\\s+")}`,
+      "i"
+    );
+    const index = text.search(searchRegex);
+    headings.push({ title: rawTitle, index });
+  }
+
+  if (headings.length === 0) {
+    return headings;
+  }
+
+  headings.sort((a, b) => {
+    if (a.index === -1 && b.index === -1) return 0;
+    if (a.index === -1) return 1;
+    if (b.index === -1) return -1;
+    return a.index - b.index;
+  });
+
+  return headings;
+}
+
+function splitByHeadingSegments(
+  text: string,
+  headings: HeadingSegment[]
+): Map<string, string> {
+  const segments = new Map<string, string>();
+
+  const validHeadings = headings.filter((heading) => heading.index >= 0);
+  if (validHeadings.length === 0) {
+    return segments;
+  }
+
+  for (let i = 0; i < validHeadings.length; i += 1) {
+    const current = validHeadings[i];
+    const next = validHeadings[i + 1];
+    const start = current.index;
+    const end = next ? next.index : text.length;
+    const chunk = text.slice(start, end).trim();
+    if (!chunk) continue;
+
+    const cleaned = stripHeading(chunk);
+    if (!cleaned) continue;
+
+    segments.set(current.title, cleaned);
+  }
+
+  return segments;
+}
+
+function stripHeading(chunk: string): string {
+  const lines = chunk.split("\n");
+  let removed = 0;
+
+  while (lines.length > 0 && lines[0].trim().length > 0 && removed < 4) {
+    lines.shift();
+    removed += 1;
+  }
+
+  while (lines.length > 0 && lines[0].trim().length === 0) {
+    lines.shift();
+  }
+
+  return lines.join("\n").trim();
+}
+
+function buildFallbackModules(text: string, baseTitle?: string): DraftModule[] {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) {
+    return [];
+  }
+
+  const chunkSize = Math.max(4, Math.ceil(paragraphs.length / 6));
+  const modules: DraftModule[] = [];
+
+  for (let i = 0; i < paragraphs.length; i += chunkSize) {
+    const chunk = paragraphs.slice(i, i + chunkSize);
+    const title =
+      i === 0 && baseTitle ? baseTitle : `学习模块 ${modules.length + 1}`;
+    const content = chunk.join("\n\n");
+    const summary =
+      content.split("\n").find((line) => line.trim().length > 0)?.trim() ?? null;
+
+    modules.push({
+      title,
+      summary,
+      sections: [
+        {
+          title,
+          content,
+          summary,
+        },
+      ],
+    });
+  }
+
+  return modules;
+}
+
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildPlaceholderContent(title: string, order: number): string {
+  return [
+    `${title}`,
+    "",
+    "该章节的正文内容暂未在 OCR 结果中识别到，请手动补充或重新上传清晰版本。",
+    `（章节顺序：第 ${order} 章）`,
+  ].join("\n");
+}

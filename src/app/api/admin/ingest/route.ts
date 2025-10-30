@@ -1,8 +1,9 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requestBaiduOcr } from "@/lib/ocr/baiduClient";
-import { buildSectionsFromOcrText } from "@/lib/ocr/sectionBuilder";
-import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
+import {
+  ingestLearningDocument,
+  type IngestLearningDocumentResult,
+} from "@/lib/learningIngestor";
 
 const ingestSchema = z.object({
   moduleId: z.string().min(1),
@@ -29,74 +30,23 @@ export async function POST(request: Request) {
       ? ([data.pageStart, data.pageEnd] as [number, number])
       : undefined;
 
-  const supabase = getSupabaseServiceClient();
-  const cacheKey = `${data.fileUrl}::${pageRange ? pageRange.join("-") : "all"}`;
-
-  let ocrResult:
-    | {
-        text: string;
-        confidence: number;
-        pages: number[];
-      }
-    | null = null;
-
-  if (supabase) {
-    const { data: cached } = await supabase
-      .from("learning_ocr_cache")
-      .select("text, confidence, pages")
-      .eq("cache_key", cacheKey)
-      .maybeSingle();
-
-    if (cached) {
-      ocrResult = {
-        text: String(cached.text ?? ""),
-        confidence: Number(cached.confidence ?? 1),
-        pages: Array.isArray(cached.pages) ? cached.pages : [],
-      };
-    }
-  }
-
-  if (!ocrResult) {
-    ocrResult = await requestBaiduOcr({
+  try {
+    const result: IngestLearningDocumentResult = await ingestLearningDocument({
+      moduleId: data.moduleId,
+      baseTitle: data.baseTitle,
       fileUrl: data.fileUrl,
       pageRange,
     });
 
-    if (supabase) {
-      await supabase
-        .from("learning_ocr_cache")
-        .upsert(
-          {
-            cache_key: cacheKey,
-            module_id: data.moduleId,
-            file_url: data.fileUrl,
-            page_start: pageRange ? pageRange[0] : null,
-            page_end: pageRange ? pageRange[1] : null,
-            text: ocrResult.text,
-            confidence: ocrResult.confidence,
-            pages: ocrResult.pages,
-          },
-          { onConflict: "cache_key" }
-        )
-        .catch(() => {
-          // swallow cache write errors
-        });
-    }
+    return NextResponse.json({
+      ...result,
+      message: `成功写入 ${result.modules.length} 个学习模块，共 ${result.totalSections} 个章节。`,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "无法完成学习模块生成，请稍后重试。";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const sections = buildSectionsFromOcrText({
-    moduleId: data.moduleId,
-    baseTitle: data.baseTitle,
-    ocrText: ocrResult.text,
-  });
-
-  return NextResponse.json({
-    moduleId: data.moduleId,
-    sections,
-    confidence: ocrResult.confidence,
-    pages: ocrResult.pages,
-    message: supabase
-      ? "OCR completed and cached in Supabase for future reuse."
-      : "OCR completed. Configure SUPABASE_SERVICE_ROLE_KEY to enable caching.",
-  });
 }

@@ -1,13 +1,25 @@
-"use client";
-
-
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import type { LearningModule } from "@/data/mockData";
+import type { LearningModuleRecord } from "@/lib/learningModules";
 
 
 
 const DEFAULT_HIGHLIGHT_COLOR = "#fff9b1";
+
+const completionFormatter = new Intl.DateTimeFormat("zh-CN", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+function formatCompletionDate(value?: string | null) {
+  if (!value) return null;
+  try {
+    return completionFormatter.format(new Date(value));
+  } catch {
+    return value;
+  }
+}
 
 
 
@@ -105,12 +117,17 @@ type AiPopover =
 
 
 
-export function LearningWorkspace({ modules }: { modules: LearningModule[] }) {
-
+export function LearningWorkspace({
+  modules,
+  onCompleteModule,
+  completingModuleId,
+}: {
+  modules: LearningModuleRecord[];
+  onCompleteModule?: (moduleId: string) => void;
+  completingModuleId?: string | null;
+}) {
   const [selectedModuleId, setSelectedModuleId] = useState(
-
     modules[0]?.id ?? ""
-
   );
 
   const selectedModule = useMemo(
@@ -124,40 +141,54 @@ export function LearningWorkspace({ modules }: { modules: LearningModule[] }) {
 
 
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
-
     selectedModule?.sections[0]?.id ?? null
-
   );
 
-
+  const selectedSection = useMemo(
+    () =>
+      selectedModule?.sections.find(
+        (section) => section.id === selectedSectionId
+      ) ?? null,
+    [selectedModule, selectedSectionId]
+  );
 
   useEffect(() => {
+    if (modules.length === 0) {
+      setSelectedModuleId("");
+      setSelectedSectionId(null);
+      return;
+    }
+
+    if (!modules.some((module) => module.id === selectedModuleId)) {
+      const fallbackModuleId = modules[0]?.id ?? "";
+      setSelectedModuleId(fallbackModuleId);
+      const fallbackSection =
+        modules.find((module) => module.id === fallbackModuleId)?.sections[0]
+          ?.id ?? null;
+      setSelectedSectionId(fallbackSection);
+      return;
+    }
 
     if (!selectedModule) {
-
       setSelectedSectionId(null);
-
       return;
-
     }
 
     if (
-
-      !selectedModule.sections.find(
-
+      !selectedModule.sections.some(
         (section) => section.id === selectedSectionId
-
       )
-
     ) {
-
       setSelectedSectionId(selectedModule.sections[0]?.id ?? null);
-
     }
+  }, [modules, selectedModule, selectedModuleId, selectedSectionId]);
 
-  }, [selectedModule, selectedSectionId]);
-
-
+  const moduleCompleted = selectedModule?.completed ?? false;
+  const moduleCompletionDate = formatCompletionDate(
+    selectedModule?.completedAt ?? null
+  );
+  const isCompletingModule =
+    completingModuleId != null && selectedModule?.id === completingModuleId;
 
   const [highlights, setHighlights] = useState<Record<string, Highlight[]>>({});
 
@@ -699,10 +730,12 @@ function addNote(entry: NoteEntry) {
 
                 <span>{module.title}</span>
 
-                <span className="text-xs font-semibold text-zinc-500">
-
-                  {Math.round(module.progress * 100)}%
-
+                <span
+                  className={`text-xs font-semibold ${
+                    module.completed ? "已完成" : "待完成"
+                  }`}
+                >
+                  {module.completed ? "已完成" : "待完成"}
                 </span>
 
               </button>
@@ -767,75 +800,81 @@ function addNote(entry: NoteEntry) {
 
       <section className="relative rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
 
-        {selectedModule && selectedSectionId ? (
-
-          selectedModule.sections
-
-            .filter((section) => section.id === selectedSectionId)
-
-            .map((section) => (
-
-              <article key={section.id} className="prose prose-zinc max-w-none text-zinc-700">
-
-                <header className="mb-6">
-
-                  <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
-
-                    {selectedModule.title}
-
-                  </p>
-
-                  <h2 className="mt-2 text-2xl font-semibold text-zinc-900">
-
-                    {section.title}
-
-                  </h2>
-
-                  <p className="text-sm text-zinc-500">
-
-                    Suggested duration ~ {section.duration}
-
-                  </p>
-
-                </header>
-
-                <div
-
-                  ref={readerRef}
-
-                  data-section-id={section.id}
-
-                  className="reading-content whitespace-pre-wrap leading-7"
-
-                >
-
-                  {renderHighlightedContent(
-
-                    section.content,
-
-                    highlights[section.id] ?? [],
-
-                    (highlight, text, event) =>
-
-                      openToolbarForHighlight(section.id, highlight, text, event),
-
-                    (highlight) => removeHighlight(section.id, highlight.id)
-
-                  )}
-
+        {selectedModule && selectedSection ? (
+          <article
+            key={selectedSection.id}
+            className="prose prose-zinc max-w-none text-zinc-700"
+          >
+            <header className="mb-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
+                {selectedModule.title}
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-zinc-900">
+                {selectedSection.title}
+              </h2>
+              {selectedModule.description && (
+                <p className="mt-2 text-sm text-zinc-500">
+                  {selectedModule.description}
+                </p>
+              )}
+              {selectedSection.durationMinutes != null && (
+                <p className="text-sm text-zinc-500">
+                  建议时长约 {selectedSection.durationMinutes} 分钟
+                </p>
+              )}
+            </header>
+            {selectedSection.summary && (
+              <p className="mb-4 text-sm text-zinc-600">
+                {selectedSection.summary}
+              </p>
+            )}
+            <div
+              ref={readerRef}
+              data-section-id={selectedSection.id}
+              className="reading-content whitespace-pre-wrap leading-7"
+            >
+              {renderHighlightedContent(
+                selectedSection.content,
+                highlights[selectedSection.id] ?? [],
+                (highlight, text, event) =>
+                  openToolbarForHighlight(
+                    selectedSection.id,
+                    highlight,
+                    text,
+                    event
+                  ),
+                (highlight) => removeHighlight(selectedSection.id, highlight.id)
+              )}
+            </div>
+            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 px-5 py-4 text-sm text-sky-700">
+              <div>
+                {moduleCompleted
+                  ? moduleCompletionDate
+                    ? `已于 ${moduleCompletionDate} 完成学习`
+                    : "已完成学习"
+                  : "请在阅读完当前模块后点击下方按钮记录学习进度。"}
+              </div>
+              {onCompleteModule && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onCompleteModule?.(selectedModule.id)}
+                    disabled={moduleCompleted || isCompletingModule}
+                    className="rounded-full bg-[rgb(0,102,255)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[rgb(0,92,230)] disabled:cursor-not-allowed disabled:bg-zinc-300"
+                  >
+                    {moduleCompleted
+                      ? "已完成学习"
+                      : isCompletingModule
+                        ? "正在记录..."
+                        : "完成学习"}
+                  </button>
                 </div>
-
-              </article>
-
-            ))
-
+              )}
+            </div>
+          </article>
         ) : (
-
-          <p className="text-sm text-zinc-500">Select a module to start reading.</p>
-
+          <p className="text-sm text-zinc-500">请选择一个模块开始阅读。</p>
         )}
-
-
 
         {toolbar && (
           <Toolbar
@@ -1021,15 +1060,15 @@ function Toolbar({
 
         label="Highlight"
 
-        icon="🖍"
+        icon="馃枍"
 
         onClick={() => onApplyHighlight(DEFAULT_HIGHLIGHT_COLOR)}
 
       />
 
-      <IconButton label="Note" icon="📄" onClick={onNote} />
+      <IconButton label="Note" icon="馃搫" onClick={onNote} />
 
-      <IconButton label="AI" icon="🤖" onClick={onAiAssist} />
+      <IconButton label="AI" icon="馃" onClick={onAiAssist} />
 
       <span className="h-4 w-px bg-zinc-200" />
 
@@ -1044,46 +1083,25 @@ function Toolbar({
 
 
 function IconButton({
-
   label,
-
   icon,
-
   onClick,
-
 }: {
-
   label: string;
-
   icon: string;
-
   onClick: () => void;
-
 }) {
-
   return (
-
     <button
-
       type="button"
-
       onClick={onClick}
-
       title={label}
-
       className="flex h-8 w-8 items-center justify-center rounded-full text-base text-zinc-600 transition hover:bg-zinc-100"
-
     >
-
       <span aria-hidden>{icon}</span>
-
     </button>
-
   );
-
 }
-
-
 
 function NoteComposer({
   draft,
@@ -1221,7 +1239,7 @@ function AiPopoverView({
 
         >
 
-          ✕
+          鉁?
 
         </button>
 
@@ -1421,4 +1439,9 @@ function generateId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 }
+
+
+
+
+
 
