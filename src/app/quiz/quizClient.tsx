@@ -70,9 +70,7 @@ export function QuizClient({ quiz }: { quiz: Quiz }) {
           />
         ))}
         <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-500">
-            点击提交后将调用 `/api/quiz`，返回自动评分结果。
-          </p>
+
           <button
             type="submit"
             className="inline-flex items-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"

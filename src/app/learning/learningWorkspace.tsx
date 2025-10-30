@@ -939,7 +939,7 @@ function addNote(entry: NoteEntry) {
 
           <h3 className="mt-2 text-lg font-semibold text-zinc-900">
 
-           Highlights & Insights
+           Insights
           </h3>
         </div>
         <div className="flex-1 space-y-3 overflow-y-auto pr-1 text-sm">

@@ -22,7 +22,7 @@ export function NavBar() {
             TESOL Platform
           </p>
           <h1 className="text-lg font-semibold text-zinc-900">
-            51Talk 外教学习与考证一体化
+            51Talk 外教学习与考证一体化平台
           </h1>
         </div>
         <nav className="flex gap-2">
@@ -39,9 +39,10 @@ export function NavBar() {
                 className={clsx(
                   "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-[rgb(0,102,255)] text-white !text-white shadow-sm hover:text-white focus:text-white"
-                    : "text-zinc-600 hover:bg-sky-100 hover:text-[rgb(0,102,255)]"
+                    ? "bg-[rgb(0,102,255)] text-white hover:text-white focus:text-white active:text-white visited:text-white shadow-sm"
+                    : "text-zinc-600 hover:bg-[rgb(0,102,255)]/10 hover:text-[rgb(0,102,255)]"
                 )}
+                style={isActive ? { color: "#ffffff" } : undefined}
               >
                 {link.label}
               </Link>
