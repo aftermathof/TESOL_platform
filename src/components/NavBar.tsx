@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const links = [
-  { href: "/", label: "仪表盘" },
+  { href: "/", label: "个人仪表盘" },
   { href: "/learning", label: "学习模块" },
-  { href: "/quiz", label: "测验中心" },
+  { href: "/quiz", label: "测验模块" },
   { href: "/certificates", label: "证书" },
 ];
 
