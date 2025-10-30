@@ -62,15 +62,25 @@ export const mockLearningModules: LearningModule[] = [
         id: "section-1-1",
         title: "Understanding TESOL Learners",
         duration: "18 min",
-        content:
-          "Explore different learner profiles, motivations, and cultural considerations when teaching English.",
+        content: [
+          "Understanding who our learners are is the foundation of every TESOL classroom. Consider their age, proficiency level, cultural background, and personal goals. A young learner preparing for study abroad will approach language with different motivations than a business professional aiming to polish presentation skills.",
+          "",
+          "Spend time collecting learner stories, interests, and challenges. Encourage them to surface their prior experiences with English and the specific contexts in which they hope to use the language. These narratives inform the tasks, topics, and scaffolds we design.",
+          "",
+          "Remember that a classroom is always multi-dimensional. Cultural expectations around participation, error correction, and time may influence how learners behave. Build norms that honour these differences while gradually expanding their repertoire."
+        ].join("\n"),
       },
       {
         id: "section-1-2",
         title: "Classroom Management Essentials",
         duration: "22 min",
-        content:
-          "Techniques for maintaining engagement and managing diverse classrooms in online and offline settings.",
+        content: [
+          "Purposeful routines keep energy high and reduce cognitive overhead. Start with concise warm-ups to activate schema, then signal transitions clearly with timers or visual cues.",
+          "",
+          "Balance teacher talk with guided interaction. Use breakout rooms, chat prompts, and collaborative documents to ensure every learner contributes within a safe structure. When issues arise, restate expectations and model the desired behaviours instead of relying on punitive measures.",
+          "",
+          "In online environments, leverage platform analytics to identify disengagement early. Greet late arrivals, check audio quickly, and provide alternative pathways (transcripts, summary boards) for those with connectivity challenges."
+        ].join("\n"),
       },
     ],
   },
@@ -85,15 +95,25 @@ export const mockLearningModules: LearningModule[] = [
         id: "section-2-1",
         title: "Backwards Design Framework",
         duration: "15 min",
-        content:
-          "Plan lessons by identifying desired learning outcomes and aligning assessments and activities.",
+        content: [
+          "Backward design flips the planning sequence. Begin by writing a vivid description of what success looks like for learners. Focus on communicative performance, not only linguistic accuracy.",
+          "",
+          "Once outcomes are clear, determine how learners will demonstrate evidence. Will they record a dialogue? Deliver a micro-presentation? Curate a reflective journal entry? These assessments drive the selection of input materials, modelling, and practice opportunities.",
+          "",
+          "Finally, curate learning experiences that gradually build towards the assessment. Scaffold with pre-task vocabulary exploration, targeted drills, and rehearsal spaces. Provide checklists so learners know what success requires."
+        ].join("\n"),
       },
       {
         id: "section-2-2",
         title: "Assessment and Feedback",
         duration: "19 min",
-        content:
-          "Use formative assessment to inform real-time adjustments and offer actionable feedback.",
+        content: [
+          "Assessment is not an end-of-unit surprise; it is woven into every interaction. Use quick pulse checks—emoji polls, thumbs up/down, exit tickets—to gauge comprehension and adjust pacing.",
+          "",
+          "When offering feedback, connect comments explicitly to learning goals. Highlight what learners did well, then provide one actionable step for improvement. Encourage peer feedback through structured prompts that focus on noticing rather than judging.",
+          "",
+          "Document observations in a shared tracker so progress discussions become data-informed. Celebrate growth, however incremental, to sustain learner motivation."
+        ].join("\n"),
       },
     ],
   },

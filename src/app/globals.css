@@ -28,3 +28,9 @@ body {
 a {
   color: inherit;
 }
+
+.highlighted-text {
+  display: inline;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}

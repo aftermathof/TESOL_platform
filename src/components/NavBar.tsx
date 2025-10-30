@@ -8,7 +8,6 @@ const links = [
   { href: "/", label: "仪表盘" },
   { href: "/learning", label: "学习模块" },
   { href: "/quiz", label: "测验中心" },
-  { href: "/teaching-plan", label: "Teaching Plan" },
   { href: "/certificates", label: "证书" },
 ];
 
@@ -20,7 +19,7 @@ export function NavBar() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div>
           <p className="text-sm uppercase tracking-widest text-sky-500">
-            TESOL Platform MVP
+            TESOL Platform
           </p>
           <h1 className="text-lg font-semibold text-zinc-900">
             51Talk 外教学习与考证一体化
@@ -40,8 +39,8 @@ export function NavBar() {
                 className={clsx(
                   "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-sky-500 text-white shadow-sm"
-                    : "text-zinc-600 hover:bg-sky-100 hover:text-sky-600"
+                    ? "bg-[rgb(0,102,255)] text-white !text-white shadow-sm hover:text-white focus:text-white"
+                    : "text-zinc-600 hover:bg-sky-100 hover:text-[rgb(0,102,255)]"
                 )}
               >
                 {link.label}

@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TESOL 一体化平台 · MVP",
+  title: "TESOL 一体化平台",
   description:
-    "51Talk TESOL 学习、测验、Teaching Plan 与证书流程 MVP 演示。",
+    "51Talk TESOL 学习、测验、Teaching Plan 与证书流程演示平台。",
 };
 
 export default function RootLayout({
