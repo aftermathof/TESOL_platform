@@ -4,7 +4,11 @@ import { useState } from "react";
 
 type AiFeedback =
   | {
-      status: "loading" | "error";
+      status: "loading";
+      message: string;
+    }
+  | {
+      status: "error";
       message: string;
     }
   | {

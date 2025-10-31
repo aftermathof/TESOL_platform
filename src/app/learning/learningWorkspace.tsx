@@ -1,11 +1,78 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { LearningModuleRecord } from "@/lib/learningModules";
 
 
 
 const DEFAULT_HIGHLIGHT_COLOR = "#fff9b1";
+
+const highlightIcon: ReactNode = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <path d="M3 21h6l12-12a3 3 0 0 0-6-6L3 15v6z" />
+    <path d="M14.5 5.5l4 4" />
+  </svg>
+);
+
+const noteIcon: ReactNode = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <path d="M7 3h10a2 2 0 0 1 2 2v12l-4-4H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+    <path d="M7 3v6h6" />
+  </svg>
+);
+
+const aiIcon: ReactNode = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <circle cx="12" cy="12" r="3.5" />
+    <path d="M12 3v2.5" />
+    <path d="M12 18.5V21" />
+    <path d="M3 12h2.5" />
+    <path d="M18.5 12H21" />
+    <path d="M5.2 5.2l1.8 1.8" />
+    <path d="M17 17l1.8 1.8" />
+    <path d="M5.2 18.8l1.8-1.8" />
+    <path d="M17 7l1.8-1.8" />
+  </svg>
+);
+
+const closeIcon: ReactNode = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    <path d="M6 6l12 12" />
+    <path d="M18 6l-12 12" />
+  </svg>
+);
 
 const completionFormatter = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
@@ -595,6 +662,9 @@ function addNote(entry: NoteEntry) {
   setNotes((prev) => [...prev, entry]);
 }
 
+function removeNote(noteId: string) {
+  setNotes((prev) => prev.filter((note) => note.id !== noteId));
+}
 
   async function requestAiAssistant(state: ToolbarState) {
 
@@ -672,9 +742,9 @@ function addNote(entry: NoteEntry) {
 
   return (
 
-    <div className="grid gap-6 md:grid-cols-[280px_1fr_320px]">
+    <div className="grid h-full min-h-0 w-full gap-6 overflow-hidden md:grid-cols-[260px_1fr_300px]">
 
-      <aside className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <aside className="flex min-h-0 flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
 
         <div>
 
@@ -684,111 +754,63 @@ function addNote(entry: NoteEntry) {
 
           </p>
 
-          <h3 className="mt-2 text-lg font-semibold text-zinc-900">
-
-            Content Outline
-
-          </h3>
+          <h3 className="mt-2 text-lg font-semibold text-zinc-900">学习大纲</h3>
 
         </div>
 
-        <nav className="flex flex-col gap-3 text-sm">
+        <nav className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
 
           {modules.map((module) => (
 
-            <div key={module.id}>
+            <button
 
-              <button
+              key={module.id}
 
-                type="button"
+              type="button"
 
-                onClick={() => {
+              onClick={() => {
 
-                  setSelectedModuleId(module.id);
+                setSelectedModuleId(module.id);
 
-                  setSelectedSectionId(module.sections[0]?.id ?? null);
+                setSelectedSectionId(module.sections[0]?.id ?? null);
 
-                  setToolbar(null);
+                setToolbar(null);
 
-                  setNoteDraft(null);
+                setNoteDraft(null);
 
-                  setAiPopover(null);
+                setAiPopover(null);
 
-                }}
+              }}
 
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left font-medium transition ${
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition ${
 
-                  module.id === selectedModuleId
+                module.id === selectedModuleId
 
-                    ? "bg-sky-100 text-sky-700"
+                  ? "bg-[rgb(0,102,255)] text-white shadow-sm"
 
-                    : "text-zinc-600 hover:bg-zinc-100"
+                  : "text-zinc-600 hover:bg-zinc-100"
+
+              }`}
+
+            >
+
+              <span className="truncate pr-3">{module.title}</span>
+
+              <span
+
+                className={`text-xs font-semibold ${
+
+                  module.completed ? "text-white/80" : "text-zinc-400"
 
                 }`}
 
               >
 
-                <span>{module.title}</span>
+                {module.completed ? "完成" : "未完成"}
 
-                <span
-                  className={`text-xs font-semibold ${
-                    module.completed ? "已完成" : "待完成"
-                  }`}
-                >
-                  {module.completed ? "已完成" : "待完成"}
-                </span>
+              </span>
 
-              </button>
-
-              {module.id === selectedModuleId && (
-
-                <ul className="mt-2 space-y-2 border-l-2 border-sky-200 pl-4 text-xs text-zinc-500">
-
-                  {module.sections.map((section) => (
-
-                    <li key={section.id}>
-
-                      <button
-
-                        type="button"
-
-                        onClick={() => {
-
-                          setSelectedSectionId(section.id);
-
-                          setToolbar(null);
-
-                          setNoteDraft(null);
-
-                          setAiPopover(null);
-
-                        }}
-
-                        className={`w-full rounded-lg px-2 py-1 text-left transition ${
-
-                          section.id === selectedSectionId
-
-                            ? "bg-sky-50 text-sky-700"
-
-                            : "hover:bg-zinc-100"
-
-                        }`}
-
-                      >
-
-                        {section.title}
-
-                      </button>
-
-                    </li>
-
-                  ))}
-
-                </ul>
-
-              )}
-
-            </div>
+            </button>
 
           ))}
 
@@ -798,121 +820,201 @@ function addNote(entry: NoteEntry) {
 
 
 
-      <section className="relative rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+      <section className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
 
         {selectedModule && selectedSection ? (
-          <article
-            key={selectedSection.id}
-            className="prose prose-zinc max-w-none text-zinc-700"
-          >
-            <header className="mb-6">
-              <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
-                {selectedModule.title}
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-zinc-900">
-                {selectedSection.title}
-              </h2>
-              {selectedModule.description && (
-                <p className="mt-2 text-sm text-zinc-500">
-                  {selectedModule.description}
-                </p>
-              )}
-              {selectedSection.durationMinutes != null && (
-                <p className="text-sm text-zinc-500">
-                  建议时长约 {selectedSection.durationMinutes} 分钟
-                </p>
-              )}
-            </header>
-            {selectedSection.summary && (
-              <p className="mb-4 text-sm text-zinc-600">
-                {selectedSection.summary}
-              </p>
-            )}
-            <div
-              ref={readerRef}
-              data-section-id={selectedSection.id}
-              className="reading-content whitespace-pre-wrap leading-7"
-            >
-              {renderHighlightedContent(
-                selectedSection.content,
-                highlights[selectedSection.id] ?? [],
-                (highlight, text, event) =>
-                  openToolbarForHighlight(
-                    selectedSection.id,
-                    highlight,
-                    text,
-                    event
-                  ),
-                (highlight) => removeHighlight(selectedSection.id, highlight.id)
-              )}
+
+          <div className="flex min-h-0 flex-1 flex-col gap-6 p-8">
+
+            <div className="flex items-center gap-2 overflow-x-auto">
+
+              {selectedModule.sections.map((section) => (
+
+                <button
+
+                  key={section.id}
+
+                  type="button"
+
+                  onClick={() => {
+
+                    setSelectedSectionId(section.id);
+
+                    setToolbar(null);
+
+                    setNoteDraft(null);
+
+                    setAiPopover(null);
+
+                  }}
+
+                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs transition ${
+
+                    section.id === selectedSectionId
+
+                      ? "border-[rgb(0,102,255)] bg-[rgb(0,102,255)] text-white"
+
+                      : "border-zinc-200 text-zinc-500 hover:border-[rgb(0,102,255)] hover:text-[rgb(0,102,255)]"
+
+                  }`}
+
+                >
+
+                  {section.title}
+
+                </button>
+
+              ))}
+
             </div>
-            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 px-5 py-4 text-sm text-sky-700">
-              <div>
-                {moduleCompleted
-                  ? moduleCompletionDate
-                    ? `已于 ${moduleCompletionDate} 完成学习`
-                    : "已完成学习"
-                  : "请在阅读完当前模块后点击下方按钮记录学习进度。"}
+
+            <h2 className="text-xl font-semibold text-zinc-900">{selectedSection.title}</h2>
+
+            <div className="flex-1 overflow-y-auto pr-3">
+
+              <div
+
+                ref={readerRef}
+
+                data-section-id={selectedSection.id}
+
+                className="reading-content whitespace-pre-wrap leading-7"
+
+              >
+
+                {renderHighlightedContent(
+
+                  selectedSection.content,
+
+                  highlights[selectedSection.id] ?? [],
+
+                  (highlight, text, event) =>
+
+                    openToolbarForHighlight(selectedSection.id, highlight, text, event),
+
+                  (highlight) => removeHighlight(selectedSection.id, highlight.id)
+
+                )}
+
               </div>
-              {onCompleteModule && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onCompleteModule?.(selectedModule.id)}
-                    disabled={moduleCompleted || isCompletingModule}
-                    className="rounded-full bg-[rgb(0,102,255)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[rgb(0,92,230)] disabled:cursor-not-allowed disabled:bg-zinc-300"
-                  >
-                    {moduleCompleted
-                      ? "已完成学习"
-                      : isCompletingModule
-                        ? "正在记录..."
-                        : "完成学习"}
-                  </button>
-                </div>
-              )}
+
             </div>
-          </article>
+
+            <div className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50/60 px-5 py-4 text-sm text-sky-700">
+
+              <div>
+
+                {moduleCompleted
+
+                  ? moduleCompletionDate
+
+                    ? `已于 ${moduleCompletionDate} 完成`
+
+                    : "已完成"
+
+                  : "完成当前模块后才会记录学习进度。"}
+
+              </div>
+
+              {onCompleteModule && (
+
+                <div className="flex justify-end">
+
+                  <button
+
+                    type="button"
+
+                    onClick={() => onCompleteModule?.(selectedModule.id)}
+
+                    disabled={moduleCompleted || isCompletingModule}
+
+                    className="rounded-full bg-[rgb(0,102,255)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[rgb(0,92,230)] disabled:cursor-not-allowed disabled:bg-zinc-300"
+
+                  >
+
+                    {moduleCompleted
+
+                      ? "已完成"
+
+                      : isCompletingModule
+
+                        ? "记录中…"
+
+                        : "完成学习"}
+
+                  </button>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </div>
+
         ) : (
-          <p className="text-sm text-zinc-500">请选择一个模块开始阅读。</p>
+
+          <p className="p-8 text-sm text-zinc-500">请选择一个模块开始学习。</p>
+
         )}
 
+
+
         {toolbar && (
+
           <Toolbar
+
             state={toolbar}
+
             onClose={() => {
+
               setToolbar(null);
+
               setAiPopover(null);
+
               window.getSelection()?.removeAllRanges();
+
             }}
+
             onApplyHighlight={(color) => applyHighlight(color, toolbar)}
+
             onNote={() => {
+
               setNoteDraft({
+
                 sectionId: toolbar.sectionId,
+
                 start: toolbar.start,
+
                 end: toolbar.end,
+
                 selectionText: toolbar.text,
+
                 text: "",
+
                 position: {
+
                   x: toolbar.position.x,
+
                   y: toolbar.position.y + 48,
+
                 },
+
               });
+
             }}
+
             onAiAssist={() => requestAiAssistant(toolbar)}
+
           />
+
         )}
 
 
 
         {aiPopover && (
 
-          <AiPopoverView
-
-            popover={aiPopover}
-
-            onClose={() => setAiPopover(null)}
-
-          />
+          <AiPopoverView popover={aiPopover} onClose={() => setAiPopover(null)} />
 
         )}
 
@@ -943,15 +1045,25 @@ function addNote(entry: NoteEntry) {
               if (!noteDraft.text.trim()) return;
 
               const note: NoteEntry = {
+
                 id: generateId("note"),
+
                 sectionId: noteDraft.sectionId,
+
                 start: noteDraft.start,
+
                 end: noteDraft.end,
+
                 text: noteDraft.text.trim(),
+
                 createdAt: new Date().toISOString(),
+
                 excerpt: noteDraft.selectionText.trim(),
+
               };
+
               addNote(note);
+
               setNoteDraft(null);
 
               window.getSelection()?.removeAllRanges();
@@ -966,7 +1078,7 @@ function addNote(entry: NoteEntry) {
 
 
 
-      <aside className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <aside className="flex min-h-0 flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
 
         <div>
 
@@ -976,40 +1088,70 @@ function addNote(entry: NoteEntry) {
 
           </p>
 
-          <h3 className="mt-2 text-lg font-semibold text-zinc-900">
+          <h3 className="mt-2 text-lg font-semibold text-zinc-900">Insights</h3>
 
-           Insights
-          </h3>
         </div>
+
         <div className="flex-1 space-y-3 overflow-y-auto pr-1 text-sm">
+
           {sectionNotes.length === 0 ? (
+
             <p className="rounded-xl bg-zinc-100/60 p-3 text-xs text-zinc-500">
 
-              Select text and use the note icon to capture your ideas.
+              选择一段文字并使用笔记图标来记录你的想法。
 
             </p>
 
           ) : (
 
             sectionNotes.map((note) => (
+
               <div
+
                 key={note.id}
-                className="rounded-xl border border-zinc-100 bg-white p-3 shadow-sm"
+
+                className="relative rounded-xl border border-zinc-100 bg-white p-3 shadow-sm"
+
               >
-                <p className="text-xs font-medium text-zinc-500">
+
+                <button
+
+                  type="button"
+
+                  onClick={() => removeNote(note.id)}
+
+                  className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-xs text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
+
+                  aria-label="删除笔记"
+
+                >
+
+                  ×
+
+                </button>
+
+                <p className="pr-6 text-xs font-medium text-zinc-500">
 
                   {new Date(note.createdAt).toLocaleString()}
 
                 </p>
 
-                <p className="mt-2 text-zinc-700 leading-6">{note.text}</p>
+                <p className="mt-2 leading-6 text-zinc-700">{note.text}</p>
+
                 <p className="mt-2 text-xs italic text-zinc-500">
-                  原文：{note.excerpt || "（空）"}
+
+                  原文：{note.excerpt || "无"}
+
                 </p>
+
               </div>
+
             ))
+
           )}
+
         </div>
+
       </aside>
 
     </div>
@@ -1017,9 +1159,6 @@ function addNote(entry: NoteEntry) {
   );
 
 }
-
-
-
 function Toolbar({
 
   state,
@@ -1060,19 +1199,19 @@ function Toolbar({
 
         label="Highlight"
 
-        icon="馃枍"
+        icon={highlightIcon}
 
         onClick={() => onApplyHighlight(DEFAULT_HIGHLIGHT_COLOR)}
 
       />
 
-      <IconButton label="Note" icon="馃搫" onClick={onNote} />
+      <IconButton label="Note" icon={noteIcon} onClick={onNote} />
 
-      <IconButton label="AI" icon="馃" onClick={onAiAssist} />
+      <IconButton label="AI" icon={aiIcon} onClick={onAiAssist} />
 
       <span className="h-4 w-px bg-zinc-200" />
 
-      <IconButton label="Close" icon="✕" onClick={onClose} />
+      <IconButton label="Close" icon={closeIcon} onClick={onClose} />
 
     </div>
 
@@ -1088,7 +1227,7 @@ function IconButton({
   onClick,
 }: {
   label: string;
-  icon: string;
+  icon: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -1098,7 +1237,7 @@ function IconButton({
       title={label}
       className="flex h-8 w-8 items-center justify-center rounded-full text-base text-zinc-600 transition hover:bg-zinc-100"
     >
-      <span aria-hidden>{icon}</span>
+      <span aria-hidden className="flex items-center justify-center">{icon}</span>
     </button>
   );
 }
@@ -1235,11 +1374,11 @@ function AiPopoverView({
 
           onClick={onClose}
 
-          className="rounded-full px-2 text-xs text-zinc-400 hover:bg-zinc-100"
+          aria-label="Close" className="rounded-full px-2 text-xs text-zinc-400 hover:bg-zinc-100"
 
         >
 
-          鉁?
+          ×
 
         </button>
 
@@ -1306,7 +1445,7 @@ function renderHighlightedContent(
     event: MouseEvent<HTMLSpanElement>
   ) => void,
   onRemoveHighlight: (highlight: Highlight) => void
-): JSX.Element[] {
+): ReactNode[] {
   if (highlights.length === 0) {
 
     return [<span key="plain">{content}</span>];
@@ -1314,10 +1453,9 @@ function renderHighlightedContent(
   }
 
 
-
   const ordered = [...highlights].sort((a, b) => a.start - b.start);
 
-  const nodes: JSX.Element[] = [];
+  const nodes: ReactNode[] = [];
 
   let cursor = 0;
 
@@ -1439,7 +1577,6 @@ function generateId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 }
-
 
 
 

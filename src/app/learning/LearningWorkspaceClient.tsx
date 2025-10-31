@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { LearningWorkspace } from "./learningWorkspace";
@@ -30,7 +30,7 @@ export function LearningWorkspaceClient() {
       const message =
         cause instanceof Error
           ? cause.message
-          : "无法获取学习模块，请稍后重试。";
+          : "无法获取学习模块，请稍后再试。";
       setError(message);
     } finally {
       setLoading(false);
@@ -56,7 +56,7 @@ export function LearningWorkspaceClient() {
       const message =
         cause instanceof Error
           ? cause.message
-          : "完成学习时出现问题，请稍后重试。";
+          : "记录完成状态时发生错误，请稍后再试。";
       setError(message);
     } finally {
       setCompletingModuleId(null);
@@ -83,7 +83,7 @@ export function LearningWorkspaceClient() {
           onClick={() => void loadModules()}
           className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
         >
-          重试
+          重新加载
         </button>
       </div>
     );
@@ -92,16 +92,18 @@ export function LearningWorkspaceClient() {
   if (modules.length === 0) {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center text-sm text-zinc-500 shadow-sm">
-        暂无学习模块内容，请联系管理员上传文档并完成识别后再试。
+        暂无学习模块内容，请联系管理员上传资料后再试。
       </div>
     );
   }
 
   return (
-    <LearningWorkspace
-      modules={modules}
-      onCompleteModule={(moduleId) => void handleCompleteModule(moduleId)}
-      completingModuleId={completingModuleId}
-    />
+    <div className="flex min-h-[60vh] flex-1 overflow-hidden">
+      <LearningWorkspace
+        modules={modules}
+        onCompleteModule={(moduleId) => void handleCompleteModule(moduleId)}
+        completingModuleId={completingModuleId}
+      />
+    </div>
   );
 }

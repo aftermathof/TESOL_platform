@@ -140,9 +140,9 @@ async function main() {
 
   console.log("");
   console.log("✅ 已写入学习模块:");
-  for (const module of result.modules) {
+  for (const moduleEntry of result.modules) {
     console.log(
-      `  - ${module.title} (${module.sectionCount} sections, id=${module.id})`
+      `  - ${moduleEntry.title} (${moduleEntry.sectionCount} sections, id=${moduleEntry.id})`
     );
   }
   console.log("");

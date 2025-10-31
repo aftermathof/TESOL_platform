@@ -9,6 +9,27 @@ type TokenCache = {
 
 let cachedToken: TokenCache | null = null;
 
+type PdfParseTextResult = {
+  text?: string;
+  pages?: Array<{ text?: string }>;
+  total?: number;
+};
+
+type PdfParseScreenshotResult = {
+  total: number;
+  pages: Array<{ pageNumber: number; data: Uint8Array }>;
+};
+
+type PdfParseInstance = {
+  getText: (params: { pageSeparator?: string; normalizeWhitespace?: boolean; includeTextContent?: boolean; partial?: number[] }) => Promise<PdfParseTextResult>;
+  getScreenshot?: (params: { partial?: number[]; scale?: number; format?: 'png' | 'jpg' | 'jpeg'; imageBuffer?: boolean; imageDataUrl?: boolean }) => Promise<PdfParseScreenshotResult>;
+  destroy?: () => Promise<void> | void;
+};
+
+type PdfParseModule = {
+  PDFParse?: new (options: { data: Buffer }) => PdfParseInstance;
+};
+
 export type OcrResult = {
   text: string;
   confidence: number;
@@ -301,69 +322,69 @@ export async function requestBaiduOcr(payload: {
 }
 
 async function tryParsePdf(buffer: Buffer): Promise<OcrResult | null> {
+  let parser: PdfParseInstance | null = null;
   try {
-    const mod = await import("pdf-parse");
-    const PDFParseClass =
-      typeof mod === "function"
-        ? (mod as unknown as { PDFParse?: new (...args: any[]) => any }).PDFParse
-        : (mod as unknown as { PDFParse?: new (...args: any[]) => any }).PDFParse ??
-          (mod.default as { PDFParse?: new (...args: any[]) => any })?.PDFParse;
-
-    if (!PDFParseClass) {
+    const mod = (await import("pdf-parse")) as PdfParseModule;
+    const PDFParseCtor = mod.PDFParse ?? (mod as { default?: PdfParseModule }).default?.PDFParse;
+    if (!PDFParseCtor) {
       return null;
     }
 
-    const parser = new PDFParseClass({ data: buffer });
-    try {
-      const textResult = await parser.getText({
-        pageSeparator: "\n\n",
-        normalizeWhitespace: true,
-        includeTextContent: false,
-      });
+    parser = new PDFParseCtor({ data: buffer });
+    const textResult = await parser.getText({
+      pageSeparator: "\n\n",
+      normalizeWhitespace: true,
+      includeTextContent: false,
+    });
 
-      const rawText =
-        (textResult?.text ?? "") ||
-        (Array.isArray(textResult?.pages)
-          ? textResult.pages.map((page: { text?: string }) => page?.text ?? "").join("\n\n")
-          : "");
+    const rawText =
+      textResult.text ??
+      (Array.isArray(textResult.pages)
+        ? textResult.pages.map((page) => page?.text ?? "").join("\n\n")
+        : "");
 
-      const normalised = rawText.replace(/\r/g, "").trim();
-      const withoutMarkers = normalised.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, " ").trim();
-      const condensed = withoutMarkers.replace(/\s+/g, "");
-      if (condensed.length < 40) {
-        return null;
-      }
+    const cleaned = rawText
+      .replace(/\u0000/g, "")
+      .replace(/\r\n?/g, "\n")
+      .replace(/\t/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
 
-      const text = withoutMarkers.replace(/\n{3,}/g, "\n\n").trim();
-      if (text.length < 80) {
-        return null;
-      }
+    if (cleaned.length < 40) {
+      return null;
+    }
 
-      const pageCount =
-        typeof textResult?.total === "number" && textResult.total > 0
-          ? textResult.total
-          : Array.isArray(textResult?.pages)
-          ? textResult.pages.length
-          : null;
+    const withoutMarkers = cleaned.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, " ").trim();
+    if (withoutMarkers.length < 40) {
+      return null;
+    }
 
-      const pages =
-        pageCount != null
-          ? Array.from({ length: pageCount }, (_, index) => index + 1)
-          : [];
+    const pageCount =
+      typeof textResult.total === "number" && textResult.total > 0
+        ? textResult.total
+        : Array.isArray(textResult.pages)
+        ? textResult.pages.length
+        : 0;
 
-      return {
-        text,
-        confidence: 1,
-        pages,
-      };
-    } finally {
-      if (typeof parser.destroy === "function") {
+    const pages =
+      pageCount > 0 ? Array.from({ length: pageCount }, (_, index) => index + 1) : [];
+
+    return {
+      text: withoutMarkers,
+      confidence: 0.95,
+      pages,
+    };
+  } catch (error) {
+    console.warn("[ocr] pdf-parse quick extraction failed:", error);
+    return null;
+  } finally {
+    if (parser && typeof parser.destroy === "function") {
+      try {
         await parser.destroy();
+      } catch {
+        // ignore
       }
     }
-  } catch (error) {
-    console.warn("[ocr] pdf-parse failed, falling back to OCR:", error);
-    return null;
   }
 }
 
@@ -398,22 +419,26 @@ async function processPdfDocument(
   let screenshotMap: Map<number, Uint8Array> | null = null;
 
   try {
-    const { PDFParse } = await import("pdf-parse");
+    const mod = (await import("pdf-parse")) as PdfParseModule;
+    const PDFParse = mod.PDFParse ?? (mod as { default?: PdfParseModule }).default?.PDFParse;
     if (typeof PDFParse === "function") {
       const parser = new PDFParse({ data: buffer });
       try {
-        const screenshotResult = await parser.getScreenshot({
-          partial: selectedIndices.map((index) => index + 1),
-          scale: 2,
-          format: "png",
-          imageBuffer: true,
-          imageDataUrl: false,
-        });
+        const getScreenshot = parser.getScreenshot?.bind(parser);
+        if (getScreenshot) {
+          const screenshotResult = await getScreenshot({
+            partial: selectedIndices.map((index) => index + 1),
+            scale: 2,
+            format: "png",
+            imageBuffer: true,
+            imageDataUrl: false,
+          });
 
-        screenshotMap = new Map<number, Uint8Array>();
-        for (const page of screenshotResult.pages ?? []) {
-          if (page?.data instanceof Uint8Array) {
-            screenshotMap.set(page.pageNumber, page.data);
+          screenshotMap = new Map<number, Uint8Array>();
+          for (const page of screenshotResult.pages ?? []) {
+            if (page?.data instanceof Uint8Array) {
+              screenshotMap.set(page.pageNumber, page.data);
+            }
           }
         }
       } finally {

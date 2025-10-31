@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 import { useAuth } from "@/components/AuthProvider";
@@ -8,6 +8,25 @@ import { useAuth } from "@/components/AuthProvider";
 type AuthMode = "signin" | "signup";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageSkeleton />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageSkeleton() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-200">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 px-6 py-4 backdrop-blur">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+        <p className="text-sm text-slate-300">正在加载登录页面…</p>
+      </div>
+    </div>
+  );
+}
+
+function LoginPageContent() {
   const supabase = getSupabaseBrowserClient();
   const { session, loading } = useAuth();
   const router = useRouter();

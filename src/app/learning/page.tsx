@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 export default function LearningPage() {
   return (
-    <div className="grid gap-6">
+    <div className="flex flex-1 flex-col gap-6 overflow-hidden">
       <header className="flex flex-col gap-2">
         <h2 className="text-2xl font-semibold text-zinc-900">学习模块</h2>
         <p className="text-sm text-zinc-500">

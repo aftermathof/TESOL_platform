@@ -1,4 +1,5 @@
 import { requestBaiduOcr } from "@/lib/ocr/baiduClient";
+import { formatModulesWithOpenRouter } from "@/lib/ai/moduleFormatter";
 import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
 
 export type IngestLearningDocumentOptions = {
@@ -87,10 +88,16 @@ export async function ingestLearningDocument(
     }
   }
 
-  const modules = buildModulesFromOcrText(ocrResult.text, options.baseTitle);
-  if (modules.length === 0) {
+  const rawModules = buildModulesFromOcrText(ocrResult.text, options.baseTitle);
+  if (rawModules.length === 0) {
     throw new Error("未能生成有效的学习模块，请检查 OCR 识别结果后重试。");
   }
+
+  const modules = await formatModulesWithOpenRouter(rawModules, {
+    sourceKey: options.moduleId,
+    baseTitle: options.baseTitle,
+    originalText: ocrResult.text,
+  });
 
   const { error: removeError } = await supabase
     .from("learning_modules")
@@ -156,7 +163,7 @@ export async function ingestLearningDocument(
   };
 }
 
-type DraftModule = {
+export type DraftModule = {
   title: string;
   summary?: string | null;
   sections: Array<{

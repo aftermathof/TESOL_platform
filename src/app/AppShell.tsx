@@ -17,7 +17,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       <NavBar />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-16 pt-10">
+      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 pb-16 pt-10">
         {children}
       </main>
     </AuthGuard>

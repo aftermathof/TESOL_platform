@@ -3,7 +3,9 @@ import { getQuiz, scoreQuiz } from "@/lib/dataService";
 import { z } from "zod";
 
 const submissionSchema = z.object({
-  answers: z.record(z.union([z.string(), z.array(z.string())])).default({}),
+  answers: z
+    .record(z.string(), z.union([z.string(), z.array(z.string())]))
+    .optional(),
 });
 
 export async function GET() {
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   const { answers } = parseResult.data;
-  const result = await scoreQuiz(answers);
+  const result = await scoreQuiz(answers ?? {});
 
   return NextResponse.json(result);
 }
