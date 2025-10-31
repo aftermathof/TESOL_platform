@@ -196,36 +196,23 @@ export async function fetchBaiduAccessToken(): Promise<string | null> {
 }
 
 async function runGeneralImageOcr(base64: string, token: string): Promise<OcrResult> {
-  const form = new URLSearchParams({
-    image: base64,
-    language_type: "CHN_ENG",
-  });
-
-  const response = await fetch(
-    `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form.toString(),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Baidu OCR responded with status ${response.status}`);
+  const primary = await callImageOcrEndpoint("general_basic", base64, token);
+  if (primary && primary.text.trim().length > 0 && !/^No text recognised\.?$/i.test(primary.text.trim())) {
+    return primary;
   }
 
-  const data = (await response.json()) as {
-    words_result?: BaiduWordLike[];
-  };
+  const secondary = await callImageOcrEndpoint("accurate_basic", base64, token);
+  if (secondary) {
+    return secondary;
+  }
 
-  const segments = extractWordSegments(data.words_result);
-  const text = buildTextFromSegments(segments);
+  if (primary) {
+    return primary;
+  }
 
   return {
-    text: text.length > 0 ? text : "No text recognised.",
-    confidence: aggregateConfidence(segments),
+    text: "No text recognised.",
+    confidence: 0,
     pages: [],
   };
 }
@@ -286,11 +273,6 @@ export async function requestBaiduOcr(payload: {
   fileUrl: string;
   pageRange?: [number, number];
 }): Promise<OcrResult> {
-  const token = await fetchBaiduAccessToken();
-  if (!token) {
-    throw new Error("Baidu OCR credentials are missing or invalid.");
-  }
-
   const response = await fetch(payload.fileUrl);
   if (!response.ok) {
     throw new Error(`Failed to download file for OCR (${response.status})`);
@@ -300,10 +282,89 @@ export async function requestBaiduOcr(payload: {
   const base64 = buffer.toString("base64");
 
   if (isPdf(response.headers.get("content-type"), payload.fileUrl)) {
+    const parsed = await tryParsePdf(buffer);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const token = await fetchBaiduAccessToken();
+  if (!token) {
+    throw new Error("Baidu OCR credentials are missing or invalid.");
+  }
+
+  if (isPdf(response.headers.get("content-type"), payload.fileUrl)) {
     return processPdfDocument(buffer, token, payload.pageRange);
   }
 
   return runGeneralImageOcr(base64, token);
+}
+
+async function tryParsePdf(buffer: Buffer): Promise<OcrResult | null> {
+  try {
+    const mod = await import("pdf-parse");
+    const PDFParseClass =
+      typeof mod === "function"
+        ? (mod as unknown as { PDFParse?: new (...args: any[]) => any }).PDFParse
+        : (mod as unknown as { PDFParse?: new (...args: any[]) => any }).PDFParse ??
+          (mod.default as { PDFParse?: new (...args: any[]) => any })?.PDFParse;
+
+    if (!PDFParseClass) {
+      return null;
+    }
+
+    const parser = new PDFParseClass({ data: buffer });
+    try {
+      const textResult = await parser.getText({
+        pageSeparator: "\n\n",
+        normalizeWhitespace: true,
+        includeTextContent: false,
+      });
+
+      const rawText =
+        (textResult?.text ?? "") ||
+        (Array.isArray(textResult?.pages)
+          ? textResult.pages.map((page: { text?: string }) => page?.text ?? "").join("\n\n")
+          : "");
+
+      const normalised = rawText.replace(/\r/g, "").trim();
+      const withoutMarkers = normalised.replace(/--\s*\d+\s+of\s+\d+\s*--/gi, " ").trim();
+      const condensed = withoutMarkers.replace(/\s+/g, "");
+      if (condensed.length < 40) {
+        return null;
+      }
+
+      const text = withoutMarkers.replace(/\n{3,}/g, "\n\n").trim();
+      if (text.length < 80) {
+        return null;
+      }
+
+      const pageCount =
+        typeof textResult?.total === "number" && textResult.total > 0
+          ? textResult.total
+          : Array.isArray(textResult?.pages)
+          ? textResult.pages.length
+          : null;
+
+      const pages =
+        pageCount != null
+          ? Array.from({ length: pageCount }, (_, index) => index + 1)
+          : [];
+
+      return {
+        text,
+        confidence: 1,
+        pages,
+      };
+    } finally {
+      if (typeof parser.destroy === "function") {
+        await parser.destroy();
+      }
+    }
+  } catch (error) {
+    console.warn("[ocr] pdf-parse failed, falling back to OCR:", error);
+    return null;
+  }
 }
 
 async function processPdfDocument(
@@ -334,15 +395,79 @@ async function processPdfDocument(
     };
   }
 
+  let screenshotMap: Map<number, Uint8Array> | null = null;
+
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    if (typeof PDFParse === "function") {
+      const parser = new PDFParse({ data: buffer });
+      try {
+        const screenshotResult = await parser.getScreenshot({
+          partial: selectedIndices.map((index) => index + 1),
+          scale: 2,
+          format: "png",
+          imageBuffer: true,
+          imageDataUrl: false,
+        });
+
+        screenshotMap = new Map<number, Uint8Array>();
+        for (const page of screenshotResult.pages ?? []) {
+          if (page?.data instanceof Uint8Array) {
+            screenshotMap.set(page.pageNumber, page.data);
+          }
+        }
+      } finally {
+        if (typeof parser.destroy === "function") {
+          await parser.destroy();
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("[ocr] screenshot extraction failed, continuing with OCR:", error);
+    screenshotMap = null;
+  }
+
   const results: OcrResult[] = [];
 
   for (const pageIndex of selectedIndices) {
+    const pageNumber = pageIndex + 1;
+
+    const screenshotData = screenshotMap?.get(pageNumber);
+    if (screenshotData) {
+      const imageBase64 = Buffer.from(screenshotData).toString("base64");
+      let imageResult: OcrResult | null = null;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const attemptResult = await runGeneralImageOcr(imageBase64, token);
+          const textTrimmed = attemptResult.text.trim();
+          if (textTrimmed.length > 0 && !/^No text recognised\.?$/i.test(textTrimmed)) {
+            imageResult = {
+              text: attemptResult.text,
+              confidence: attemptResult.confidence,
+              pages: [pageNumber],
+            };
+            break;
+          }
+        } catch (error) {
+          if (attempt === 1) {
+            console.warn(`[ocr] general OCR failed on page ${pageNumber}, falling back:`, error);
+          }
+        }
+      }
+
+      if (imageResult) {
+        results.push(imageResult);
+        continue;
+      }
+    }
+
     const chunkPdf = await PDFDocument.create();
     const [copiedPage] = await chunkPdf.copyPages(pdf, [pageIndex]);
     chunkPdf.addPage(copiedPage);
     const chunkBytes = await chunkPdf.save();
     const chunkBase64 = Buffer.from(chunkBytes).toString("base64");
-    const pageNumber = pageIndex + 1;
+
     const chunkResult = await runDocumentOcr(chunkBase64, token, [pageNumber]);
     results.push(chunkResult);
   }
@@ -391,4 +516,61 @@ function mergeOcrResults(chunks: OcrResult[]): OcrResult {
     confidence,
     pages,
   };
+}
+
+async function callImageOcrEndpoint(
+  endpoint: "general_basic" | "accurate_basic",
+  base64: string,
+  token: string
+): Promise<OcrResult | null> {
+  try {
+    const form = new URLSearchParams({
+      image: base64,
+      language_type: "CHN_ENG",
+    });
+
+    const response = await fetch(
+      `https://aip.baidubce.com/rest/2.0/ocr/v1/${endpoint}?access_token=${token}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: form.toString(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Baidu OCR ${endpoint} responded with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as {
+      words_result?: Array<{ words?: string }>;
+    };
+
+    const words =
+      data.words_result
+        ?.map((item) => normaliseText(item.words))
+        .filter((value) => value.length > 0) ?? [];
+
+    if (words.length === 0) {
+      return null;
+    }
+
+    const text = words.join("\n").trim();
+    if (text.length === 0) {
+      return null;
+    }
+
+    const confidence = Math.min(1, Math.max(0, words.length / 10));
+
+    return {
+      text,
+      confidence,
+      pages: [],
+    };
+  } catch (error) {
+    console.warn(`[ocr] ${endpoint} call failed:`, error);
+    return null;
+  }
 }

@@ -48,8 +48,16 @@ export async function ingestLearningDocument(
         }
       : null;
 
-  if (ocrResult && ocrResult.text.trim().length < 24) {
-    ocrResult = null;
+  if (ocrResult) {
+    const trimmed = ocrResult.text.trim();
+    const markerOnly = /^(\s*--\s*\d+\s+of\s+\d+\s*--\s*)+$/i.test(trimmed);
+    if (
+      trimmed.length < 24 ||
+      markerOnly ||
+      /\bNo text recognised\.?/i.test(trimmed)
+    ) {
+      ocrResult = null;
+    }
   }
 
   if (!ocrResult) {
@@ -254,7 +262,7 @@ function splitByHeadingSegments(
     const chunk = text.slice(start, end).trim();
     if (!chunk) continue;
 
-    const cleaned = stripHeading(chunk);
+    const cleaned = removeContentsLines(stripHeading(chunk));
     if (!cleaned) continue;
 
     segments.set(current.title, cleaned);
@@ -277,6 +285,27 @@ function stripHeading(chunk: string): string {
   }
 
   return lines.join("\n").trim();
+}
+
+function removeContentsLines(body: string): string {
+  const lines = body.split("\n");
+  const filtered: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+
+    if (/^\d+\s+[^\d\s].*$/u.test(line)) {
+      const nextLine = lines[index + 1]?.trim();
+      if (nextLine && /^\d+$/.test(nextLine)) {
+        index += 1;
+      }
+      continue;
+    }
+
+    filtered.push(lines[index]);
+  }
+
+  return filtered.join("\n").trim();
 }
 
 function buildFallbackModules(text: string, baseTitle?: string): DraftModule[] {
