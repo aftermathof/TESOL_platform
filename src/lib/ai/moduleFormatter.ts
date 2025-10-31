@@ -6,6 +6,12 @@ type FormatterOptions = {
   originalText?: string;
 };
 
+export type FormatModulesResult = {
+  modules: DraftModule[];
+  usedFormatter: boolean;
+  formatterModel?: string;
+};
+
 type FormatterResponse = {
   modules?: Array<{
     title?: string;
@@ -29,15 +35,18 @@ const FORMAT_PROMPT = process.env.OPENROUTE_FORMAT_PROMPT?.trim() ?? "";
 export async function formatModulesWithOpenRouter(
   modules: DraftModule[],
   options: FormatterOptions
-): Promise<DraftModule[]> {
+): Promise<FormatModulesResult> {
   if (!FORMAT_PROMPT) {
-    return modules;
+    console.warn(
+      "[moduleFormatter] OPENROUTE_FORMAT_PROMPT missing, skipping formatter."
+    );
+    return { modules, usedFormatter: false };
   }
 
   const apiKey = process.env.OPENROUTE_API_KEY?.trim();
   if (!apiKey) {
     console.warn("[moduleFormatter] OPENROUTE_API_KEY is missing, skipping formatting.");
-    return modules;
+    return { modules, usedFormatter: false };
   }
 
   try {
@@ -124,9 +133,13 @@ export async function formatModulesWithOpenRouter(
       });
     }
 
-    return formatted;
+    return {
+      modules: formatted,
+      usedFormatter: true,
+      formatterModel: OPENROUTE_MODEL,
+    };
   } catch (error) {
     console.warn("[moduleFormatter] formatting failed, using original content:", error);
-    return modules;
+    return { modules, usedFormatter: false, formatterModel: OPENROUTE_MODEL };
   }
 }

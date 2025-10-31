@@ -18,7 +18,6 @@ type RawSectionRow = {
 type RawModuleRow = {
   id: string;
   title: string | null;
-  description: string | null;
   order_index: number | null;
   sections?: RawSectionRow[] | null;
   progress?: RawProgressRow[] | null;
@@ -36,7 +35,6 @@ export type ModuleSectionRecord = {
 export type LearningModuleRecord = {
   id: string;
   title: string;
-  description: string | null;
   orderIndex: number | null;
   sections: ModuleSectionRecord[];
   completed: boolean;
@@ -59,7 +57,6 @@ export async function fetchLearningModules(): Promise<LearningModuleRecord[]> {
       `
         id,
         title,
-        description,
         order_index,
         sections:module_sections (
           id,
@@ -105,7 +102,6 @@ export async function fetchLearningModules(): Promise<LearningModuleRecord[]> {
     return {
       id: module.id,
       title: module.title ?? DEFAULT_MODULE_TITLE,
-      description: module.description ?? null,
       orderIndex: module.order_index ?? null,
       sections,
       completed: completedRecord != null,

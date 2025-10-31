@@ -7,7 +7,6 @@ create table if not exists public.learning_modules (
   id uuid primary key default gen_random_uuid(),
   source_key text not null,
   title text not null,
-  description text,
   order_index integer default 0,
   created_at timestamptz not null default timezone('utc'::text, now())
 );
@@ -28,6 +27,15 @@ create table if not exists public.module_sections (
 
 create index if not exists module_sections_module_idx
   on public.module_sections (module_id, order_index);
+
+create table if not exists public.learning_documents (
+  source_key text primary key,
+  raw_text text,
+  formatted_text text,
+  formatter_model text,
+  formatter_used boolean default false,
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
 
 create table if not exists public.module_progress (
   module_id uuid not null references public.learning_modules(id) on delete cascade,
@@ -55,35 +63,61 @@ create index if not exists learning_ocr_cache_module_idx
 
 alter table public.learning_modules enable row level security;
 alter table public.module_sections enable row level security;
+alter table public.learning_documents enable row level security;
 alter table public.module_progress enable row level security;
 alter table public.learning_ocr_cache enable row level security;
 
-create policy if not exists "learning_modules_read"
+drop policy if exists "learning_modules_read" on public.learning_modules;
+create policy "learning_modules_read"
   on public.learning_modules
   for select
   using (auth.role() = 'authenticated');
 
-create policy if not exists "module_sections_read"
+drop policy if exists "module_sections_read" on public.module_sections;
+create policy "module_sections_read"
   on public.module_sections
   for select
   using (auth.role() = 'authenticated');
 
-create policy if not exists "module_progress_select"
+drop policy if exists "learning_documents_read" on public.learning_documents;
+create policy "learning_documents_read"
+  on public.learning_documents
+  for select
+  using (auth.role() = 'authenticated');
+
+drop policy if exists "learning_documents_service_upsert" on public.learning_documents;
+create policy "learning_documents_service_upsert"
+  on public.learning_documents
+  for insert
+  with check (auth.role() = 'service_role');
+
+drop policy if exists "learning_documents_service_update" on public.learning_documents;
+create policy "learning_documents_service_update"
+  on public.learning_documents
+  for update
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+drop policy if exists "module_progress_select" on public.module_progress;
+create policy "module_progress_select"
   on public.module_progress
   for select
   using (auth.uid() = user_id);
 
-create policy if not exists "module_progress_upsert"
+drop policy if exists "module_progress_upsert" on public.module_progress;
+create policy "module_progress_upsert"
   on public.module_progress
   for insert
   with check (auth.uid() = user_id);
 
-create policy if not exists "ocr_cache_service_read"
+drop policy if exists "ocr_cache_service_read" on public.learning_ocr_cache;
+create policy "ocr_cache_service_read"
   on public.learning_ocr_cache
   for select
   using (auth.role() = 'service_role');
 
-create policy if not exists "ocr_cache_service_write"
+drop policy if exists "ocr_cache_service_write" on public.learning_ocr_cache;
+create policy "ocr_cache_service_write"
   on public.learning_ocr_cache
   for insert
   with check (auth.role() = 'service_role');

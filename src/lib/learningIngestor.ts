@@ -88,16 +88,38 @@ export async function ingestLearningDocument(
     }
   }
 
-  const rawModules = buildModulesFromOcrText(ocrResult.text, options.baseTitle);
+  const ocrModules = buildModulesFromOcrText(
+    ocrResult.text,
+    options.baseTitle
+  );
+  const rawModules = ocrModules.modules;
   if (rawModules.length === 0) {
     throw new Error("未能生成有效的学习模块，请检查 OCR 识别结果后重试。");
   }
 
-  const modules = await formatModulesWithOpenRouter(rawModules, {
+  const formatterResult = await formatModulesWithOpenRouter(rawModules, {
     sourceKey: options.moduleId,
     baseTitle: options.baseTitle,
     originalText: ocrResult.text,
   });
+  const modules = formatterResult.modules;
+  const formattedDocument = serializeModules(modules);
+
+  const { error: documentError } = await supabase
+    .from("learning_documents")
+    .upsert(
+      {
+        source_key: options.moduleId,
+        raw_text: ocrResult.text,
+        formatted_text: formattedDocument,
+        formatter_model: formatterResult.formatterModel ?? null,
+        formatter_used: formatterResult.usedFormatter,
+      },
+      { onConflict: "source_key" }
+    );
+  if (documentError) {
+    throw documentError;
+  }
 
   const { error: removeError } = await supabase
     .from("learning_modules")
@@ -117,7 +139,6 @@ export async function ingestLearningDocument(
       .insert({
         source_key: options.moduleId,
         title: module.title,
-        description: module.summary ?? null,
         order_index: index,
       })
       .select("id")
@@ -159,7 +180,7 @@ export async function ingestLearningDocument(
     totalSections,
     ocrConfidence: ocrResult.confidence,
     pages: ocrResult.pages,
-    usedFallback: true,
+    usedFallback: ocrModules.usedFallback,
   };
 }
 
@@ -173,17 +194,25 @@ export type DraftModule = {
   }>;
 };
 
-export function buildModulesFromOcrText(text: string, baseTitle?: string): DraftModule[] {
+export type ModulesFromOcr = {
+  modules: DraftModule[];
+  usedFallback: boolean;
+};
+
+export function buildModulesFromOcrText(
+  text: string,
+  baseTitle?: string
+): ModulesFromOcr {
   const normalised = text.replace(/\r/g, "").trim();
   if (!normalised) {
-    return [];
+    return { modules: [], usedFallback: true };
   }
 
   const headings = extractHeadingSegments(normalised);
   if (headings.length > 0) {
     const segmentMap = splitByHeadingSegments(normalised, headings);
 
-    return headings.map((heading, index) => {
+    const structured = headings.map((heading, index) => {
       const content =
         segmentMap.get(heading.title) ??
         buildPlaceholderContent(heading.title, index + 1);
@@ -202,9 +231,42 @@ export function buildModulesFromOcrText(text: string, baseTitle?: string): Draft
         ],
       };
     });
+
+    return { modules: structured, usedFallback: false };
   }
 
-  return buildFallbackModules(normalised, baseTitle);
+  return {
+    modules: buildFallbackModules(normalised, baseTitle),
+    usedFallback: true,
+  };
+}
+
+function serializeModules(modules: DraftModule[]): string {
+  return modules
+    .map((module, moduleIndex) => {
+      const heading = `${moduleIndex + 1}. ${module.title}`;
+      const summary = module.summary?.trim()
+        ? `摘要：${module.summary.trim()}`
+        : null;
+      const sections = module.sections.map((section, sectionIndex) => {
+        const sectionHeading =
+          module.sections.length > 1
+            ? `${moduleIndex + 1}.${sectionIndex + 1} ${section.title}`
+            : section.title;
+        const sectionParts = [
+          sectionHeading,
+          section.summary?.trim() ?? null,
+          section.content,
+        ].filter((part): part is string => Boolean(part && part.trim().length));
+
+        return sectionParts.join("\n");
+      });
+
+      return [heading, summary, ...sections]
+        .filter((part): part is string => Boolean(part && part.trim().length))
+        .join("\n\n");
+    })
+    .join("\n\n");
 }
 
 type HeadingSegment = {
