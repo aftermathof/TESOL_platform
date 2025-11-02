@@ -10,136 +10,204 @@ export type FormatModulesResult = {
   modules: DraftModule[];
   usedFormatter: boolean;
   formatterModel?: string;
-};
-
-type FormatterResponse = {
-  modules?: Array<{
-    title?: string;
-    summary?: string | null;
-    sections?: Array<{
-      title?: string;
-      summary?: string | null;
-      content?: string;
-    }>;
-  }>;
+  error?: string | null;
 };
 
 const OPENROUTE_ENDPOINT =
   process.env.OPENROUTE_API_URL ?? "https://openrouter.ai/api/v1/chat/completions";
-
 const OPENROUTE_MODEL =
-  process.env.OPENROUTE_MODEL ?? "gemini-2.0-flash";
+  process.env.OPENROUTE_MODEL ?? "google/gemini-2.5-flash";
 
-const FORMAT_PROMPT = process.env.OPENROUTE_FORMAT_PROMPT?.trim() ?? "";
+const SECTION_SYSTEM_PROMPT = `You are a meticulous editor who cleans OCR text.
+- Preserve the original meaning and sentence order.
+- Merge broken lines into coherent paragraphs.
+- Remove standalone page numbers, headers/footers, and obvious OCR garbage.
+- Keep paragraph breaks using blank lines.
+- Do not return markdown code fences or additional commentary. Output clean plain text only.`;
+
+const SUMMARY_SYSTEM_PROMPT = `You are an assistant who rewrites short summaries.
+Clean up OCR artifacts, merge broken sentences, and return a concise summary in plain text.`;
+
+let cachedApiKey: string | null = null;
+
+function resolveApiKey(): string | null {
+  if (cachedApiKey !== null) {
+    return cachedApiKey;
+  }
+  cachedApiKey = process.env.OPENROUTE_API_KEY?.trim() ?? null;
+  if (!cachedApiKey) {
+    console.warn("[moduleFormatter] OPENROUTE_API_KEY missing, skipping formatter.");
+  }
+  return cachedApiKey;
+}
 
 export async function formatModulesWithOpenRouter(
   modules: DraftModule[],
   options: FormatterOptions
 ): Promise<FormatModulesResult> {
-  if (!FORMAT_PROMPT) {
-    console.warn(
-      "[moduleFormatter] OPENROUTE_FORMAT_PROMPT missing, skipping formatter."
-    );
-    return { modules, usedFormatter: false };
+  const apiKey = resolveApiKey();
+  if (!apiKey) {
+    return {
+      modules,
+      usedFormatter: false,
+      error: "OPENROUTE_API_KEY is not set.",
+    };
   }
 
-  const apiKey = process.env.OPENROUTE_API_KEY?.trim();
-  if (!apiKey) {
-    console.warn("[moduleFormatter] OPENROUTE_API_KEY is missing, skipping formatting.");
-    return { modules, usedFormatter: false };
+  const cleanedModules: DraftModule[] = [];
+  const errors: string[] = [];
+  let successCount = 0;
+  let changed = false;
+
+  for (const module of modules) {
+    const cleanedSections = [];
+    let cleanedSummary = module.summary ?? null;
+
+    if (module.summary?.trim()) {
+      const summaryResult = await cleanTextWithOpenRouter({
+        apiKey,
+        systemPrompt: SUMMARY_SYSTEM_PROMPT,
+        userContent: module.summary,
+      });
+      if (summaryResult.ok) {
+        successCount += 1;
+        if (summaryResult.text !== module.summary) {
+          cleanedSummary = summaryResult.text;
+          changed = true;
+        }
+      } else if (summaryResult.error) {
+        errors.push(`[module ${module.title}] summary: ${summaryResult.error}`);
+      }
+    }
+
+    for (const section of module.sections) {
+      const result = await cleanTextWithOpenRouter({
+        apiKey,
+        systemPrompt: SECTION_SYSTEM_PROMPT,
+        userContent: section.content,
+      });
+      if (result.ok) {
+        successCount += 1;
+        const cleanedContent = result.text;
+        if (cleanedContent !== section.content) {
+          changed = true;
+        }
+
+        let cleanedSectionSummary = section.summary ?? null;
+        if (section.summary?.trim()) {
+          const summaryResult = await cleanTextWithOpenRouter({
+            apiKey,
+            systemPrompt: SUMMARY_SYSTEM_PROMPT,
+            userContent: section.summary,
+          });
+          if (summaryResult.ok) {
+            successCount += 1;
+            if (summaryResult.text !== section.summary) {
+              cleanedSectionSummary = summaryResult.text;
+              changed = true;
+            }
+          } else if (summaryResult.error) {
+            errors.push(
+              `[module ${module.title}] section ${section.title} summary: ${summaryResult.error}`
+            );
+          }
+        }
+
+        cleanedSections.push({
+          ...section,
+          content: cleanedContent,
+          summary: cleanedSectionSummary,
+        });
+      } else {
+        errors.push(
+          `[module ${module.title}] section ${section.title}: ${result.error ?? "unknown error"}`
+        );
+        cleanedSections.push(section);
+      }
+    }
+
+    cleanedModules.push({
+      ...module,
+      sections: cleanedSections,
+      summary: cleanedSummary,
+    });
+  }
+
+  return {
+    modules: cleanedModules,
+    usedFormatter: successCount > 0 && changed,
+    formatterModel: OPENROUTE_MODEL,
+    error: errors.length > 0 ? errors.join(" | ") : null,
+  };
+}
+
+type CleanTextResult =
+  | { ok: true; text: string }
+  | { ok: false; text: string; error?: string | null };
+
+async function cleanTextWithOpenRouter(params: {
+  apiKey: string;
+  systemPrompt: string;
+  userContent: string;
+}): Promise<CleanTextResult> {
+  const { apiKey, systemPrompt, userContent } = params;
+  if (!userContent.trim()) {
+    return { ok: true, text: "" };
   }
 
   try {
-    const payload = {
-      model: OPENROUTE_MODEL,
-      temperature: 0,
-      max_tokens: 2800,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: FORMAT_PROMPT,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            sourceKey: options.sourceKey,
-            baseTitle: options.baseTitle ?? null,
-            modules,
-            originalText: options.originalText ?? null,
-          }),
-        },
-      ],
-    };
-
     const response = await fetch(OPENROUTE_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: OPENROUTE_MODEL,
+        max_tokens: 2048,
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      }),
     });
 
+    const raw = await response.text();
     if (!response.ok) {
-      throw new Error(`OpenRouter responded with status ${response.status}`);
+      return {
+        ok: false,
+        text: userContent,
+        error: `status ${response.status}: ${raw}`,
+      };
     }
 
-    const data = (await response.json()) as {
+    const data = JSON.parse(raw) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
-
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("OpenRouter returned empty content");
-    }
-
-    const parsed = JSON.parse(content) as FormatterResponse;
-    if (!parsed.modules || !Array.isArray(parsed.modules)) {
-      throw new Error("Formatted response missing modules array.");
-    }
-
-    const formatted: DraftModule[] = [];
-
-    for (let index = 0; index < modules.length; index += 1) {
-      const original = modules[index];
-      const candidate = parsed.modules[index];
-
-      if (!candidate) {
-        formatted.push(original);
-        continue;
-      }
-
-      const formattedSections =
-        candidate.sections?.map((section, sectionIndex) => ({
-          title: section.title?.trim() || original.sections[sectionIndex]?.title || original.title,
-          summary:
-            section.summary?.trim() ??
-            original.sections[sectionIndex]?.summary ??
-            original.summary ??
-            null,
-          content:
-            section.content?.trim().length
-              ? section.content.trim()
-              : original.sections[sectionIndex]?.content ?? original.summary ?? "",
-        })) ?? original.sections;
-
-      formatted.push({
-        title: candidate.title?.trim() || original.title,
-        summary:
-          candidate.summary?.trim() ??
-          (formattedSections[0]?.summary ?? original.summary ?? null),
-        sections: formattedSections,
-      });
+    const cleaned = data.choices?.[0]?.message?.content?.trim();
+    if (!cleaned) {
+      return { ok: false, text: userContent, error: "LLM returned empty content." };
     }
 
     return {
-      modules: formatted,
-      usedFormatter: true,
-      formatterModel: OPENROUTE_MODEL,
+      ok: true,
+      text: stripCodeFence(cleaned),
     };
   } catch (error) {
-    console.warn("[moduleFormatter] formatting failed, using original content:", error);
-    return { modules, usedFormatter: false, formatterModel: OPENROUTE_MODEL };
+    return {
+      ok: false,
+      text: userContent,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
+}
+
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fence = trimmed.match(/^```(?:[\w-]+)?\s*([\s\S]*?)\s*```$/);
+  if (fence) {
+    return fence[1].trim();
+  }
+  return trimmed;
 }

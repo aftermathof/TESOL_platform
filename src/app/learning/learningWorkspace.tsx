@@ -742,7 +742,7 @@ function removeNote(noteId: string) {
 
   return (
 
-    <div className="grid h-full min-h-0 w-full gap-6 overflow-hidden md:grid-cols-[260px_1fr_300px]">
+    <div className="grid h-full min-h-0 w-full gap-6 overflow-visible md:grid-cols-[260px_1fr_300px]">
 
       <aside className="flex min-h-0 flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
 
@@ -798,7 +798,7 @@ function removeNote(noteId: string) {
 
               <span
 
-                className={`text-xs font-semibold ${
+                className={`whitespace-nowrap text-xs font-semibold ${
 
                   module.completed ? "text-white/80" : "text-zinc-400"
 
@@ -820,7 +820,7 @@ function removeNote(noteId: string) {
 
 
 
-      <section className="relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <section className="relative flex min-h-0 flex-col overflow-visible rounded-2xl border border-zinc-200 bg-white shadow-sm">
 
         {selectedModule && selectedSection ? (
 

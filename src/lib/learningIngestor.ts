@@ -1,6 +1,7 @@
 import { requestBaiduOcr } from "@/lib/ocr/baiduClient";
 import { formatModulesWithOpenRouter } from "@/lib/ai/moduleFormatter";
 import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type IngestLearningDocumentOptions = {
   moduleId: string;
@@ -88,21 +89,40 @@ export async function ingestLearningDocument(
     }
   }
 
-  const ocrModules = buildModulesFromOcrText(
-    ocrResult.text,
-    options.baseTitle
-  );
+  const ocrModules = buildModulesFromOcrText(ocrResult.text, options.baseTitle);
   const rawModules = ocrModules.modules;
   if (rawModules.length === 0) {
     throw new Error("未能生成有效的学习模块，请检查 OCR 识别结果后重试。");
   }
 
-  const formatterResult = await formatModulesWithOpenRouter(rawModules, {
-    sourceKey: options.moduleId,
-    baseTitle: options.baseTitle,
-    originalText: ocrResult.text,
-  });
-  const modules = formatterResult.modules;
+  const reuseResult = await tryReuseFormattedModules(
+    supabase,
+    options.moduleId,
+    ocrResult.text
+  );
+
+  let modules: DraftModule[];
+  let formatterUsed: boolean;
+  let formatterModel: string | null;
+  let formatterError: string | null;
+
+  if (reuseResult) {
+    modules = reuseResult.modules;
+    formatterUsed = reuseResult.usedFormatter;
+    formatterModel = reuseResult.formatterModel ?? null;
+    formatterError = reuseResult.error ?? null;
+  } else {
+    const formatterResult = await formatModulesWithOpenRouter(rawModules, {
+      sourceKey: options.moduleId,
+      baseTitle: options.baseTitle,
+      originalText: ocrResult.text,
+    });
+    modules = cleanupFormattedModules(formatterResult.modules);
+    formatterUsed = formatterResult.usedFormatter;
+    formatterModel = formatterResult.formatterModel ?? null;
+    formatterError = formatterResult.error ?? null;
+  }
+
   const formattedDocument = serializeModules(modules);
 
   const { error: documentError } = await supabase
@@ -112,8 +132,10 @@ export async function ingestLearningDocument(
         source_key: options.moduleId,
         raw_text: ocrResult.text,
         formatted_text: formattedDocument,
-        formatter_model: formatterResult.formatterModel ?? null,
-        formatter_used: formatterResult.usedFormatter,
+        formatted_modules: serializeModulesForStorage(modules),
+        formatter_model: formatterModel,
+        formatter_used: formatterUsed,
+        formatter_error: formatterError ?? null,
       },
       { onConflict: "source_key" }
     );
@@ -267,6 +289,149 @@ function serializeModules(modules: DraftModule[]): string {
         .join("\n\n");
     })
     .join("\n\n");
+}
+
+async function tryReuseFormattedModules(
+  supabase: SupabaseClient,
+  sourceKey: string,
+  rawText: string
+): Promise<{
+  modules: DraftModule[];
+  usedFormatter: boolean;
+  formatterModel?: string | null;
+  error?: string | null;
+} | null> {
+  const { data, error } = await supabase
+    .from("learning_documents")
+    .select(
+      "raw_text, formatted_modules, formatter_model, formatter_used, formatter_error"
+    )
+    .eq("source_key", sourceKey)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[learningIngestor] failed to load cached document:", error);
+    return null;
+  }
+
+  if (!data || typeof data.raw_text !== "string") {
+    return null;
+  }
+
+  if (data.raw_text !== rawText) {
+    return null;
+  }
+
+  const restored = deserializeModulesFromStorage(data.formatted_modules);
+  if (!restored) {
+    return null;
+  }
+
+  return {
+    modules: restored,
+    usedFormatter: Boolean(data.formatter_used),
+    formatterModel: data.formatter_model ?? null,
+    error: data.formatter_error ?? null,
+  };
+}
+
+function serializeModulesForStorage(modules: DraftModule[]) {
+  return modules.map((module) => ({
+    title: module.title,
+    summary: module.summary ?? null,
+    sections: module.sections.map((section) => ({
+      title: section.title,
+      summary: section.summary ?? null,
+      content: section.content,
+    })),
+  }));
+}
+
+function deserializeModulesFromStorage(value: unknown): DraftModule[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  try {
+    return value.map((module) => {
+      const moduleTitle =
+        typeof (module as { title?: unknown }).title === "string"
+          ? ((module as { title: string }).title ?? "")
+          : String((module as { title?: unknown }).title ?? "");
+
+      const moduleSummary =
+        typeof (module as { summary?: unknown }).summary === "string" ||
+        (module as { summary?: unknown }).summary === null
+          ? ((module as { summary: string | null }).summary ?? null)
+          : null;
+
+      const rawSections = Array.isArray((module as { sections?: unknown }).sections)
+        ? ((module as { sections: unknown[] }).sections ?? [])
+        : [];
+
+      const sections = rawSections.map((section) => {
+        const title =
+          typeof (section as { title?: unknown }).title === "string"
+            ? ((section as { title: string }).title ?? "")
+            : String((section as { title?: unknown }).title ?? "");
+
+        const summary =
+          typeof (section as { summary?: unknown }).summary === "string" ||
+          (section as { summary?: unknown }).summary === null
+            ? ((section as { summary: string | null }).summary ?? null)
+            : null;
+
+        const content =
+          typeof (section as { content?: unknown }).content === "string"
+            ? ((section as { content: string }).content ?? "")
+            : "";
+
+        return {
+          title,
+          summary,
+          content,
+        };
+      });
+
+      return {
+        title: moduleTitle,
+        summary: moduleSummary,
+        sections,
+      };
+    });
+  } catch (error) {
+    console.warn("[learningIngestor] failed to restore cached formatter modules:", error);
+    return null;
+  }
+}
+
+function cleanupFormattedModules(modules: DraftModule[]): DraftModule[] {
+  return modules.map((module) => ({
+    ...module,
+    summary: cleanupFormattedText(module.summary),
+    sections: module.sections.map((section) => ({
+      ...section,
+      summary: cleanupFormattedText(section.summary),
+      content: cleanupFormattedContent(section.content),
+    })),
+  }));
+}
+
+function cleanupFormattedText(value?: string | null): string | null {
+  if (!value) return value ?? null;
+  const placeholder = "__DOUBLE_BREAK__";
+  const normalised = value
+    .replace(/\r/g, "")
+    .replace(/\n{2,}/g, placeholder)
+    .replace(/\n+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(new RegExp(placeholder, "g"), "\n\n")
+    .trim();
+  return normalised.length > 0 ? normalised : null;
+}
+
+function cleanupFormattedContent(value: string): string {
+  return cleanupFormattedText(value) ?? "";
 }
 
 type HeadingSegment = {

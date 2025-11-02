@@ -32,8 +32,10 @@ create table if not exists public.learning_documents (
   source_key text primary key,
   raw_text text,
   formatted_text text,
+  formatted_modules jsonb,
   formatter_model text,
   formatter_used boolean default false,
+  formatter_error text,
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
 
