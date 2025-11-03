@@ -86,11 +86,17 @@ export function DashboardClient() {
   const nextModule = useMemo(() => {
     if (modules.length === 0) return null;
     const firstIncomplete = modules.find((module) => !module.completed);
-    return firstIncomplete ?? modules[modules.length - 1];
+    return firstIncomplete ?? null; // 当所有模块都完成时返回null
   }, [modules]);
 
   const nextModuleDisplay = useMemo(() => {
-    if (!nextModule) return "";
+    if (!nextModule) {
+      // 如果没有未完成的模块，检查是否所有模块都已完成
+      if (modules.length > 0 && modules.every(module => module.completed)) {
+        return "已全部完成";
+      }
+      return "";
+    }
     const index = modules.findIndex((module) => module.id === nextModule.id);
     return formatModuleDisplay(nextModule, index < 0 ? 0 : index);
   }, [modules, nextModule]);
@@ -118,18 +124,26 @@ export function DashboardClient() {
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
         <h2 className="text-2xl font-semibold text-zinc-900">欢迎回来，继续你的 TESOL 学习旅程</h2>
-        {nextModule && (
+        {(nextModule || nextModuleDisplay === "已全部完成") && (
           <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-6 text-sm text-sky-700 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="font-semibold text-sky-900">下一学习任务：{nextModuleDisplay}</p>
+              <p className="font-semibold text-sky-900">
+                {nextModuleDisplay === "已全部完成" ? "学习状态：已全部完成" : `下一学习任务：${nextModuleDisplay}`}
+              </p>
               <p>当前完成进度：{completionLabel}</p>
             </div>
-            <Link
-              href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
-              className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium !text-white hover:bg-[rgb(0,92,230)] hover:!text-white focus-visible:!text-white active:!text-white visited:!text-white"
-            >
-              前往学习模块
-            </Link>
+            {nextModule ? (
+              <Link
+                href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
+                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium !text-white hover:bg-[rgb(0,92,230)] hover:!text-white focus-visible:!text-white active:!text-white visited:!text-white"
+              >
+                前往学习模块
+              </Link>
+            ) : (
+              <div className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 font-medium text-white">
+                🎉 恭喜完成所有模块
+              </div>
+            )}
           </div>
         )}
       </section>
