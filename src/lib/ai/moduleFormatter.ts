@@ -43,8 +43,9 @@ function resolveApiKey(): string | null {
 
 export async function formatModulesWithOpenRouter(
   modules: DraftModule[],
-  options: FormatterOptions
+  _options: FormatterOptions
 ): Promise<FormatModulesResult> {
+  void _options;
   const apiKey = resolveApiKey();
   if (!apiKey) {
     return {
@@ -59,28 +60,30 @@ export async function formatModulesWithOpenRouter(
   let successCount = 0;
   let changed = false;
 
-  for (const module of modules) {
+  for (const draftModule of modules) {
     const cleanedSections = [];
-    let cleanedSummary = module.summary ?? null;
+    let cleanedSummary = draftModule.summary ?? null;
 
-    if (module.summary?.trim()) {
+    if (draftModule.summary?.trim()) {
       const summaryResult = await cleanTextWithOpenRouter({
         apiKey,
         systemPrompt: SUMMARY_SYSTEM_PROMPT,
-        userContent: module.summary,
+        userContent: draftModule.summary,
       });
       if (summaryResult.ok) {
         successCount += 1;
-        if (summaryResult.text !== module.summary) {
+        if (summaryResult.text !== draftModule.summary) {
           cleanedSummary = summaryResult.text;
           changed = true;
         }
       } else if (summaryResult.error) {
-        errors.push(`[module ${module.title}] summary: ${summaryResult.error}`);
+        errors.push(
+          `[module ${draftModule.title}] summary: ${summaryResult.error}`
+        );
       }
     }
 
-    for (const section of module.sections) {
+    for (const section of draftModule.sections) {
       const result = await cleanTextWithOpenRouter({
         apiKey,
         systemPrompt: SECTION_SYSTEM_PROMPT,
@@ -108,7 +111,7 @@ export async function formatModulesWithOpenRouter(
             }
           } else if (summaryResult.error) {
             errors.push(
-              `[module ${module.title}] section ${section.title} summary: ${summaryResult.error}`
+              `[module ${draftModule.title}] section ${section.title} summary: ${summaryResult.error}`
             );
           }
         }
@@ -120,14 +123,14 @@ export async function formatModulesWithOpenRouter(
         });
       } else {
         errors.push(
-          `[module ${module.title}] section ${section.title}: ${result.error ?? "unknown error"}`
+          `[module ${draftModule.title}] section ${section.title}: ${result.error ?? "unknown error"}`
         );
         cleanedSections.push(section);
       }
     }
 
     cleanedModules.push({
-      ...module,
+      ...draftModule,
       sections: cleanedSections,
       summary: cleanedSummary,
     });

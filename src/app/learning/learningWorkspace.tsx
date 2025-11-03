@@ -1,7 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useAuth } from "@/components/AuthProvider";
 import type { LearningModuleRecord } from "@/lib/learningModules";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 
 
 
@@ -102,6 +104,12 @@ type Highlight = {
 
   color: string;
 
+  excerpt?: string;
+
+  createdAt?: string;
+
+  pending?: boolean;
+
 };
 
 
@@ -114,6 +122,7 @@ type NoteEntry = {
   text: string;
   createdAt: string;
   excerpt: string;
+  pending?: boolean;
 };
 
 
@@ -188,14 +197,22 @@ export function LearningWorkspace({
   modules,
   onCompleteModule,
   completingModuleId,
+  initialModuleId,
 }: {
   modules: LearningModuleRecord[];
   onCompleteModule?: (moduleId: string) => void;
   completingModuleId?: string | null;
+  initialModuleId?: string;
 }) {
-  const [selectedModuleId, setSelectedModuleId] = useState(
-    modules[0]?.id ?? ""
-  );
+  const { user } = useAuth();
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(() => {
+    if (initialModuleId && modules.some((module) => module.id === initialModuleId)) {
+      return initialModuleId;
+    }
+    return modules[0]?.id ?? null;
+  });
 
   const selectedModule = useMemo(
 
@@ -221,34 +238,48 @@ export function LearningWorkspace({
 
   useEffect(() => {
     if (modules.length === 0) {
-      setSelectedModuleId("");
+      setSelectedModuleId(null);
       setSelectedSectionId(null);
       return;
     }
 
-    if (!modules.some((module) => module.id === selectedModuleId)) {
-      const fallbackModuleId = modules[0]?.id ?? "";
-      setSelectedModuleId(fallbackModuleId);
-      const fallbackSection =
-        modules.find((module) => module.id === fallbackModuleId)?.sections[0]
-          ?.id ?? null;
-      setSelectedSectionId(fallbackSection);
-      return;
-    }
+    setSelectedModuleId((current) => {
+      if (current) {
+        const existing = modules.find((module) => module.id === current);
+        if (existing) {
+          return existing.id;
+        }
+      }
 
+      if (initialModuleId) {
+        const initialTarget = modules.find(
+          (module) => module.id === initialModuleId
+        );
+        if (initialTarget) {
+          return initialTarget.id;
+        }
+      }
+
+      return modules[0]?.id ?? null;
+    });
+  }, [modules, initialModuleId]);
+
+  useEffect(() => {
     if (!selectedModule) {
       setSelectedSectionId(null);
       return;
     }
 
-    if (
-      !selectedModule.sections.some(
-        (section) => section.id === selectedSectionId
-      )
-    ) {
-      setSelectedSectionId(selectedModule.sections[0]?.id ?? null);
-    }
-  }, [modules, selectedModule, selectedModuleId, selectedSectionId]);
+    setSelectedSectionId((current) => {
+      if (
+        current &&
+        selectedModule.sections.some((section) => section.id === current)
+      ) {
+        return current;
+      }
+      return selectedModule.sections[0]?.id ?? null;
+    });
+  }, [selectedModule]);
 
   const moduleCompleted = selectedModule?.completed ?? false;
   const moduleCompletionDate = formatCompletionDate(
@@ -267,9 +298,120 @@ export function LearningWorkspace({
 
   const [aiPopover, setAiPopover] = useState<AiPopover>(null);
 
+  const [loadingAnnotations, setLoadingAnnotations] = useState(false);
+
 
 
   const readerRef = useRef<HTMLDivElement | null>(null);
+
+
+
+  useEffect(() => {
+    if (!user?.id || modules.length === 0) {
+      setHighlights({});
+      setNotes([]);
+      return;
+    }
+
+    const sectionIds = modules.flatMap((module) =>
+      module.sections.map((section) => section.id)
+    );
+
+    if (sectionIds.length === 0) {
+      setHighlights({});
+      setNotes([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingAnnotations(true);
+
+    async function loadAnnotations() {
+      try {
+        const [highlightResult, noteResult] = await Promise.all([
+          supabase
+            .from("module_highlights")
+            .select(
+              "id, section_id, start_index, end_index, color, excerpt, created_at"
+            )
+            .in("section_id", sectionIds)
+            .order("start_index", { ascending: true }),
+          supabase
+            .from("module_notes")
+            .select(
+              "id, section_id, start_index, end_index, note_text, excerpt, created_at"
+            )
+            .in("section_id", sectionIds)
+            .order("created_at", { ascending: true }),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (highlightResult.error) {
+          console.error("Failed to load highlights", highlightResult.error);
+        }
+        if (noteResult.error) {
+          console.error("Failed to load notes", noteResult.error);
+        }
+
+        const highlightMap: Record<string, Highlight[]> = {};
+
+        for (const row of highlightResult.data ?? []) {
+          const sectionId = row.section_id;
+          if (!sectionId) {
+            continue;
+          }
+          const highlight: Highlight = {
+            id: row.id,
+            sectionId,
+            start: row.start_index ?? 0,
+            end: row.end_index ?? 0,
+            color: row.color ?? DEFAULT_HIGHLIGHT_COLOR,
+            excerpt: row.excerpt ?? undefined,
+            createdAt: row.created_at ?? undefined,
+            pending: false,
+          };
+          if (!highlightMap[sectionId]) {
+            highlightMap[sectionId] = [];
+          }
+          highlightMap[sectionId].push(highlight);
+        }
+
+        Object.keys(highlightMap).forEach((key) => {
+          highlightMap[key].sort((a, b) => a.start - b.start);
+        });
+
+        setHighlights(highlightMap);
+
+        const fetchedNotes: NoteEntry[] = (noteResult.data ?? []).map(
+          (row) => ({
+            id: row.id,
+            sectionId: row.section_id,
+            start: row.start_index ?? 0,
+            end: row.end_index ?? 0,
+            text: row.note_text ?? "",
+            excerpt: row.excerpt ?? "",
+            createdAt: row.created_at ?? new Date().toISOString(),
+            pending: false,
+          })
+        );
+
+        setNotes(fetchedNotes);
+      } finally {
+        if (!cancelled) {
+          setLoadingAnnotations(false);
+        }
+      }
+    }
+
+    void loadAnnotations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modules, supabase, user?.id]);
 
 
 
@@ -410,8 +552,13 @@ export function LearningWorkspace({
 
 
       const rect = range.getBoundingClientRect();
-
-      const containerRect = sectionElement.getBoundingClientRect();
+      const containerRect =
+        readerRef.current?.closest("section")?.getBoundingClientRect();
+      if (!containerRect) {
+        setToolbar(null);
+        setAiPopover(null);
+        return;
+      }
 
 
 
@@ -492,122 +639,178 @@ export function LearningWorkspace({
 
 
 
-  function applyHighlight(color: string, state: ToolbarState) {
+  async function applyHighlight(color: string, state: ToolbarState) {
+    if (!selectedModule || !user?.id) {
+      setToolbar(null);
+      return;
+    }
 
-    const newId = state.highlightId ?? generateId("hl");
+    const trimmedColor = color || DEFAULT_HIGHLIGHT_COLOR;
 
-
-
-    setHighlights((prev) => {
-
-      const existing = prev[state.sectionId] ?? [];
-
-      const next: Highlight[] = [];
-
-
-
-      for (const item of existing) {
-
-        if (item.id === state.highlightId) {
-
-          continue;
-
-        }
-
-
-
-        if (item.end <= state.start || item.start >= state.end) {
-
-          next.push(item);
-
-          continue;
-
-        }
-
-
-
-        if (item.start < state.start) {
-
-          next.push({ ...item, id: generateId("hl"), end: state.start });
-
-        }
-
-
-
-        if (item.end > state.end) {
-
-          next.push({ ...item, id: generateId("hl"), start: state.end });
-
-        }
-
-      }
-
-
-
-      next.push({
-
-        id: newId,
-
-        sectionId: state.sectionId,
-
-        start: state.start,
-
-        end: state.end,
-
-        color,
-
+    if (state.highlightId) {
+      setHighlights((prev) => {
+        const existing = prev[state.sectionId] ?? [];
+        return {
+          ...prev,
+          [state.sectionId]: existing.map((item) =>
+            item.id === state.highlightId ? { ...item, color: trimmedColor } : item
+          ),
+        };
       });
 
+      setToolbar((prev) =>
+        prev ? { ...prev, highlightId: state.highlightId, origin: "highlight" } : prev
+      );
 
+      const { error } = await supabase
+        .from("module_highlights")
+        .update({
+          color: trimmedColor,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", state.highlightId);
+
+      if (error) {
+        console.error("Failed to update highlight", error);
+      }
+
+      return;
+    }
+
+    const tempId = generateId("hl");
+    const timestamp = new Date().toISOString();
+    const overlappingIds: string[] = [];
+
+    setHighlights((prev) => {
+      const existing = prev[state.sectionId] ?? [];
+      const remaining = existing.filter((item) => {
+        const overlaps = !(item.end <= state.start || item.start >= state.end);
+        if (overlaps) {
+          overlappingIds.push(item.id);
+        }
+        return !overlaps;
+      });
+
+      const next: Highlight[] = [
+        ...remaining,
+        {
+          id: tempId,
+          sectionId: state.sectionId,
+          start: state.start,
+          end: state.end,
+          color: trimmedColor,
+          excerpt: state.text.trim(),
+          createdAt: timestamp,
+          pending: true,
+        },
+      ];
 
       next.sort((a, b) => a.start - b.start);
 
-
-
       return {
-
         ...prev,
-
         [state.sectionId]: next,
-
       };
-
     });
 
-
-
     setToolbar((prev) =>
-
-      prev ? { ...prev, highlightId: newId, origin: "highlight" } : prev
-
+      prev ? { ...prev, highlightId: tempId, origin: "highlight" } : prev
     );
 
+    if (overlappingIds.length > 0) {
+      const { error } = await supabase
+        .from("module_highlights")
+        .delete()
+        .in("id", overlappingIds);
+      if (error) {
+        console.error("Failed to delete overlapping highlights", error);
+      }
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("module_highlights")
+        .insert({
+          user_id: user.id,
+          module_id: selectedModule.id,
+          section_id: state.sectionId,
+          start_index: state.start,
+          end_index: state.end,
+          color: trimmedColor,
+          excerpt: state.text.trim(),
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setHighlights((prev) => {
+        const sectionHighlights = prev[state.sectionId] ?? [];
+        return {
+          ...prev,
+          [state.sectionId]: sectionHighlights
+            .map((item) =>
+              item.id === tempId
+                ? {
+                    ...item,
+                    id: data.id,
+                    pending: false,
+                    createdAt: data.created_at ?? item.createdAt,
+                    start: data.start_index ?? item.start,
+                    end: data.end_index ?? item.end,
+                  }
+                : item
+            )
+            .sort((a, b) => a.start - b.start),
+        };
+      });
+
+      setToolbar((prev) =>
+        prev ? { ...prev, highlightId: data.id, origin: "highlight" } : prev
+      );
+    } catch (error) {
+      console.error("Failed to save highlight", error);
+      setHighlights((prev) => {
+        const sectionHighlights = prev[state.sectionId] ?? [];
+        return {
+          ...prev,
+          [state.sectionId]: sectionHighlights.filter((item) => item.id !== tempId),
+        };
+      });
+    }
   }
 
 
 
-  function removeHighlight(sectionId: string, highlightId: string) {
-
+  async function removeHighlight(sectionId: string, highlightId: string) {
     setHighlights((prev) => {
-
       const existing = prev[sectionId] ?? [];
-
       return {
-
         ...prev,
-
         [sectionId]: existing.filter((item) => item.id !== highlightId),
-
       };
-
     });
 
     setToolbar(null);
-
     setAiPopover(null);
-
     window.getSelection()?.removeAllRanges();
 
+    if (!user?.id) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("module_highlights")
+      .delete()
+      .eq("id", highlightId);
+
+    if (error) {
+      console.error("Failed to delete highlight", error);
+    }
   }
 
 
@@ -658,13 +861,92 @@ export function LearningWorkspace({
 
 
 
-function addNote(entry: NoteEntry) {
-  setNotes((prev) => [...prev, entry]);
-}
+  async function saveNoteFromDraft(draft: NoteDraft) {
+    if (!selectedModule || !user?.id) {
+      setNoteDraft(null);
+      return;
+    }
 
-function removeNote(noteId: string) {
-  setNotes((prev) => prev.filter((note) => note.id !== noteId));
-}
+    const trimmedText = draft.text.trim();
+    if (!trimmedText) {
+      return;
+    }
+
+    const tempId = generateId("note");
+    const createdAt = new Date().toISOString();
+    const newNote: NoteEntry = {
+      id: tempId,
+      sectionId: draft.sectionId,
+      start: draft.start,
+      end: draft.end,
+      text: trimmedText,
+      createdAt,
+      excerpt: draft.selectionText.trim(),
+      pending: true,
+    };
+
+    setNotes((prev) => [...prev, newNote]);
+
+    try {
+      const { data, error } = await supabase
+        .from("module_notes")
+        .insert({
+          user_id: user.id,
+          module_id: selectedModule.id,
+          section_id: draft.sectionId,
+          start_index: draft.start,
+          end_index: draft.end,
+          note_text: trimmedText,
+          excerpt: draft.selectionText.trim(),
+          created_at: createdAt,
+          updated_at: createdAt,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setNotes((prev) =>
+        prev.map((note) =>
+          note.id === tempId
+            ? {
+                ...note,
+                id: data.id,
+                createdAt: data.created_at ?? note.createdAt,
+                start: data.start_index ?? note.start,
+                end: data.end_index ?? note.end,
+                excerpt: data.excerpt ?? note.excerpt,
+                pending: false,
+              }
+            : note
+        )
+      );
+    } catch (error) {
+      console.error("Failed to save note", error);
+      setNotes((prev) => prev.filter((note) => note.id !== tempId));
+    } finally {
+      setNoteDraft(null);
+      window.getSelection()?.removeAllRanges();
+    }
+  }
+
+  async function removeNote(noteId: string) {
+    setNotes((prev) => prev.filter((note) => note.id !== noteId));
+
+    if (!user?.id) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("module_notes")
+      .delete()
+      .eq("id", noteId);
+    if (error) {
+      console.error("Failed to delete note", error);
+    }
+  }
 
   async function requestAiAssistant(state: ToolbarState) {
 
@@ -754,7 +1036,7 @@ function removeNote(noteId: string) {
 
           </p>
 
-          <h3 className="mt-2 text-lg font-semibold text-zinc-900">学习大纲</h3>
+          <h3 className="mt-2 text-lg font-semibold text-zinc-900">学习模块</h3>
 
         </div>
 
@@ -806,7 +1088,7 @@ function removeNote(noteId: string) {
 
               >
 
-                {module.completed ? "完成" : "未完成"}
+                {module.completed ? "已完成" : "未完成"}
 
               </span>
 
@@ -908,11 +1190,11 @@ function removeNote(noteId: string) {
 
                   ? moduleCompletionDate
 
-                    ? `已于 ${moduleCompletionDate} 完成`
+                    ? `已于 ${moduleCompletionDate} 完成该模块。`
 
-                    : "已完成"
+                    : "已完成该模块。"
 
-                  : "完成当前模块后才会记录学习进度。"}
+                  : "完成全部学习内容后，点击下方按钮即可标记为完成。"}
 
               </div>
 
@@ -938,9 +1220,9 @@ function removeNote(noteId: string) {
 
                       : isCompletingModule
 
-                        ? "记录中…"
+                        ? "标记中…"
 
-                        : "完成学习"}
+                        : "标记为完成"}
 
                   </button>
 
@@ -954,7 +1236,7 @@ function removeNote(noteId: string) {
 
         ) : (
 
-          <p className="p-8 text-sm text-zinc-500">请选择一个模块开始学习。</p>
+          <p className="p-8 text-sm text-zinc-500">请选择一个学习模块开始学习。</p>
 
         )}
 
@@ -1044,29 +1326,7 @@ function removeNote(noteId: string) {
 
               if (!noteDraft.text.trim()) return;
 
-              const note: NoteEntry = {
-
-                id: generateId("note"),
-
-                sectionId: noteDraft.sectionId,
-
-                start: noteDraft.start,
-
-                end: noteDraft.end,
-
-                text: noteDraft.text.trim(),
-
-                createdAt: new Date().toISOString(),
-
-                excerpt: noteDraft.selectionText.trim(),
-
-              };
-
-              addNote(note);
-
-              setNoteDraft(null);
-
-              window.getSelection()?.removeAllRanges();
+              void saveNoteFromDraft(noteDraft);
 
             }}
 
@@ -1084,7 +1344,7 @@ function removeNote(noteId: string) {
 
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
 
-            Personal Notes
+            个人笔记
 
           </p>
 
@@ -1094,11 +1354,19 @@ function removeNote(noteId: string) {
 
         <div className="flex-1 space-y-3 overflow-y-auto pr-1 text-sm">
 
-          {sectionNotes.length === 0 ? (
+          {loadingAnnotations ? (
 
             <p className="rounded-xl bg-zinc-100/60 p-3 text-xs text-zinc-500">
 
-              选择一段文字并使用笔记图标来记录你的想法。
+              正在同步你的高亮与笔记...
+
+            </p>
+
+          ) : sectionNotes.length === 0 ? (
+
+            <p className="rounded-xl bg-zinc-100/60 p-3 text-xs text-zinc-500">
+
+              选择一段文本并添加笔记以便回顾。
 
             </p>
 
@@ -1118,7 +1386,11 @@ function removeNote(noteId: string) {
 
                   type="button"
 
-                  onClick={() => removeNote(note.id)}
+                  onClick={() => {
+
+                    void removeNote(note.id);
+
+                  }}
 
                   className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-xs text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
 
@@ -1126,7 +1398,11 @@ function removeNote(noteId: string) {
 
                 >
 
-                  ×
+                  <span aria-hidden className="flex items-center justify-center">
+
+                    {closeIcon}
+
+                  </span>
 
                 </button>
 
@@ -1140,7 +1416,7 @@ function removeNote(noteId: string) {
 
                 <p className="mt-2 text-xs italic text-zinc-500">
 
-                  原文：{note.excerpt || "无"}
+                  原文：{note.excerpt || ""}
 
                 </p>
 
@@ -1189,7 +1465,7 @@ function Toolbar({
 
     <div
 
-      className="pointer-events-auto absolute z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-zinc-200 bg-white/95 px-2 py-1 shadow-xl"
+      className="pointer-events-auto absolute z-[1000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-zinc-200 bg-white/95 px-2 py-1 shadow-xl"
 
       style={{ left: state.position.x, top: state.position.y }}
 
@@ -1250,7 +1526,7 @@ function NoteComposer({
 }: {
   draft: NoteDraft;
   onChangeText: (text: string) => void;
-  onSave: () => void;
+  onSave: () => Promise<void> | void;
   onCancel: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1262,7 +1538,7 @@ function NoteComposer({
     >
       <div className="flex items-center justify-between">
 
-        <h4 className="text-sm font-semibold text-zinc-800">Add note</h4>
+        <h4 className="text-sm font-semibold text-zinc-800">添加笔记</h4>
 
         <button
 
@@ -1274,14 +1550,14 @@ function NoteComposer({
 
         >
 
-          Cancel
+          取消
 
         </button>
 
       </div>
 
       <p className="mt-2 text-xs text-zinc-500">
-        Selection:
+        选中内容：
         {draft.selectionText.length > 120
           ? ` ${draft.selectionText.slice(0, 116)}...`
           : ` ${draft.selectionText}`}
@@ -1289,7 +1565,7 @@ function NoteComposer({
       <textarea
         ref={textareaRef}
         className="mt-3 h-32 w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        placeholder="Capture your thoughts..."
+        placeholder="写下你的想法..."
         value={draft.text}
         onChange={(event) => onChangeText(event.target.value)}
       />
@@ -1306,7 +1582,7 @@ function NoteComposer({
 
         >
 
-          Cancel
+          取消
 
         </button>
 
@@ -1314,7 +1590,9 @@ function NoteComposer({
 
           type="button"
 
-          onClick={onSave}
+          onClick={() => {
+            void onSave();
+          }}
 
           disabled={!draft.text.trim()}
 
@@ -1322,7 +1600,7 @@ function NoteComposer({
 
         >
 
-          Save note
+          保存笔记
 
         </button>
 
@@ -1378,7 +1656,7 @@ function AiPopoverView({
 
         >
 
-          ×
+          
 
         </button>
 
@@ -1577,6 +1855,7 @@ function generateId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 }
+
 
 
 

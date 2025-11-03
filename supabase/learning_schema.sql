@@ -46,6 +46,38 @@ create table if not exists public.module_progress (
   primary key (module_id, user_id)
 );
 
+create table if not exists public.module_highlights (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  module_id uuid not null references public.learning_modules(id) on delete cascade,
+  section_id uuid not null references public.module_sections(id) on delete cascade,
+  start_index integer not null,
+  end_index integer not null,
+  color text not null default '#fff9b1',
+  excerpt text,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create index if not exists module_highlights_section_idx
+  on public.module_highlights (section_id, user_id);
+
+create table if not exists public.module_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  module_id uuid not null references public.learning_modules(id) on delete cascade,
+  section_id uuid not null references public.module_sections(id) on delete cascade,
+  start_index integer not null,
+  end_index integer not null,
+  note_text text not null,
+  excerpt text,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create index if not exists module_notes_section_idx
+  on public.module_notes (section_id, user_id, created_at);
+
 create table if not exists public.learning_ocr_cache (
   cache_key text primary key,
   module_id text not null,
@@ -68,6 +100,8 @@ alter table public.module_sections enable row level security;
 alter table public.learning_documents enable row level security;
 alter table public.module_progress enable row level security;
 alter table public.learning_ocr_cache enable row level security;
+alter table public.module_highlights enable row level security;
+alter table public.module_notes enable row level security;
 
 drop policy if exists "learning_modules_read" on public.learning_modules;
 create policy "learning_modules_read"
@@ -111,6 +145,56 @@ create policy "module_progress_upsert"
   on public.module_progress
   for insert
   with check (auth.uid() = user_id);
+
+drop policy if exists "module_highlights_select" on public.module_highlights;
+create policy "module_highlights_select"
+  on public.module_highlights
+  for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "module_highlights_insert" on public.module_highlights;
+create policy "module_highlights_insert"
+  on public.module_highlights
+  for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "module_highlights_update" on public.module_highlights;
+create policy "module_highlights_update"
+  on public.module_highlights
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "module_highlights_delete" on public.module_highlights;
+create policy "module_highlights_delete"
+  on public.module_highlights
+  for delete
+  using (auth.uid() = user_id);
+
+drop policy if exists "module_notes_select" on public.module_notes;
+create policy "module_notes_select"
+  on public.module_notes
+  for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "module_notes_insert" on public.module_notes;
+create policy "module_notes_insert"
+  on public.module_notes
+  for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "module_notes_update" on public.module_notes;
+create policy "module_notes_update"
+  on public.module_notes
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "module_notes_delete" on public.module_notes;
+create policy "module_notes_delete"
+  on public.module_notes
+  for delete
+  using (auth.uid() = user_id);
 
 drop policy if exists "ocr_cache_service_read" on public.learning_ocr_cache;
 create policy "ocr_cache_service_read"

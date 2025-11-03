@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LearningWorkspace } from "./learningWorkspace";
 import {
   fetchLearningModules,
@@ -9,11 +10,13 @@ import {
 } from "@/lib/learningModules";
 
 export function LearningWorkspaceClient() {
+  const searchParams = useSearchParams();
+  const initialModuleId = searchParams.get("module") ?? undefined;
   const [modules, setModules] = useState<LearningModuleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completingModuleId, setCompletingModuleId] = useState<string | null>(
-    null
+    null,
   );
 
   useEffect(() => {
@@ -41,17 +44,8 @@ export function LearningWorkspaceClient() {
     setCompletingModuleId(moduleId);
     try {
       await markModuleCompleted(moduleId);
-      setModules((prev) =>
-        prev.map((module) =>
-          module.id === moduleId
-            ? {
-                ...module,
-                completed: true,
-                completedAt: new Date().toISOString(),
-              }
-            : module
-        )
-      );
+      const refreshed = await fetchLearningModules();
+      setModules(refreshed);
     } catch (cause) {
       const message =
         cause instanceof Error
@@ -98,9 +92,10 @@ export function LearningWorkspaceClient() {
   }
 
   return (
-    <div className="flex min-h-[60vh] flex-1 overflow-hidden">
+    <div className="flex min-h-[60vh] flex-1 overflow-visible">
       <LearningWorkspace
         modules={modules}
+        initialModuleId={initialModuleId}
         onCompleteModule={(moduleId) => void handleCompleteModule(moduleId)}
         completingModuleId={completingModuleId}
       />
