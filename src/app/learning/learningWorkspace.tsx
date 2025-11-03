@@ -34,11 +34,12 @@ const noteIcon: ReactNode = (
     strokeLinejoin="round"
     className="h-4 w-4"
   >
-    <path d="M7 3h10a2 2 0 0 1 2 2v12l-4-4H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-    <path d="M7 3v6h6" />
+    <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+    <path d="M14 2v4h4" />
+    <path d="M9 11h6" />
+    <path d="M9 15h6" />
   </svg>
 );
-
 const aiIcon: ReactNode = (
   <svg
     viewBox="0 0 24 24"
@@ -49,15 +50,15 @@ const aiIcon: ReactNode = (
     strokeLinejoin="round"
     className="h-4 w-4"
   >
-    <circle cx="12" cy="12" r="3.5" />
-    <path d="M12 3v2.5" />
-    <path d="M12 18.5V21" />
-    <path d="M3 12h2.5" />
-    <path d="M18.5 12H21" />
-    <path d="M5.2 5.2l1.8 1.8" />
-    <path d="M17 17l1.8 1.8" />
-    <path d="M5.2 18.8l1.8-1.8" />
-    <path d="M17 7l1.8-1.8" />
+    <path d="M12 2v4" />
+    <rect x="4" y="6" width="16" height="12" rx="3" />
+    <path d="M2 14h2" />
+    <path d="M20 14h2" />
+    <path d="M8 22h8" />
+    <path d="M10 18v4" />
+    <path d="M14 18v4" />
+    <circle cx="9" cy="12" r="1" />
+    <circle cx="15" cy="12" r="1" />
   </svg>
 );
 
