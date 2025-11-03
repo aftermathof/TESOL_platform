@@ -1,11 +1,14 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 import { useAuth } from "@/components/AuthProvider";
 
 type AuthMode = "signin" | "signup";
+const enableDemoLogin =
+  process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === "true";
 
 export default function LoginPage() {
   return (
@@ -40,38 +43,17 @@ function LoginPageContent() {
   }, [loading, session, router, redirect]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      <nav className="flex items-center justify-between px-8 py-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
-            <span className="text-xl font-semibold text-white">TESOL</span>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-300">
-              51Talk
-            </p>
-            <p className="text-sm font-medium text-slate-100">
-              学习 · 测验 · Teaching Plan · 证书
-            </p>
-          </div>
-        </div>
-        <div className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
-          <span>隐私政策</span>
-          <span>帮助中心</span>
-          <span>联系支持</span>
-        </div>
-      </nav>
-      <main className="flex flex-1 items-center justify-center px-6 pb-16 pt-8">
-        <LoginCard redirect={redirect} supabase={supabase} />
-      </main>
-      <footer className="px-8 pb-6 text-xs text-slate-400">
-        2025 © 51Talk TESOL Platform. Inspired by Apple design principles.
-      </footer>
+    <div className="relative flex min-h-screen items-center justify-center bg-white text-slate-900">
+      <div className="absolute left-6 top-8 text-2xl font-semibold tracking-[0.3em] text-slate-900">
+        51Talk
+      </div>
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-slate-300 via-blue-500 to-slate-300 opacity-70" />
+      <AuthContainer redirect={redirect} supabase={supabase} />
     </div>
   );
 }
 
-function LoginCard({
+function AuthContainer({
   supabase,
   redirect,
 }: {
@@ -85,17 +67,24 @@ function LoginCard({
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  const isSignIn = mode === "signin";
+
+  const handleForgotPassword = () => {
+    window.open("mailto:support@51talk.com");
+  };
 
   const toggleMode = () =>
     setMode((current) => (current === "signin" ? "signup" : "signin"));
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
 
     try {
-      if (mode === "signin") {
+      if (isSignIn) {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -105,7 +94,7 @@ function LoginCard({
         }
       } else {
         if (!fullName.trim()) {
-          throw new Error("请填写姓名，以便生成证书。");
+          throw new Error("请填写姓名，以便生成证书");
         }
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -121,11 +110,10 @@ function LoginCard({
           throw signUpError;
         }
         if (data.session == null) {
-          const { error: signInError } =
-            await supabase.auth.signInWithPassword({
-              email,
-              password,
-            });
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
           if (signInError) {
             throw signInError;
           }
@@ -134,10 +122,20 @@ function LoginCard({
 
       router.replace(redirect);
     } catch (cause) {
+      if (
+        enableDemoLogin &&
+        cause instanceof Error &&
+        cause.message.toLowerCase().includes("failed to fetch")
+      ) {
+        console.warn(
+          "[AuthContainer] Supabase unavailable, entering demo login mode.",
+          cause
+        );
+        router.replace(redirect);
+        return;
+      }
       const message =
-        cause instanceof Error
-          ? cause.message
-          : "登录失败，请稍后再试。";
+        cause instanceof Error ? cause.message : "登录失败，请稍后再试";
       setError(message);
     } finally {
       setSubmitting(false);
@@ -145,88 +143,137 @@ function LoginCard({
   }
 
   return (
-    <section className="w-full max-w-[460px] rounded-[32px] bg-white/5 p-10 shadow-2xl backdrop-blur-xl">
-      <h1 className="text-3xl font-semibold text-white">
-        {mode === "signin" ? "欢迎回来" : "创建 51Talk TESOL 账号"}
-      </h1>
-      <p className="mt-2 text-sm text-slate-300">
-        使用注册邮箱和密码登录，完成学习、测试并领取证书。
-      </p>
-      <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-        {mode === "signup" && (
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-widest text-slate-300">
-              姓名
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40"
-              placeholder="用于证书展示的姓名"
-              autoComplete="name"
-              required
-            />
-          </div>
-        )}
-        <div>
-          <label className="text-xs font-semibold uppercase tracking-widest text-slate-300">
-            邮箱
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40"
-            placeholder="example@51talk.com"
-            autoComplete="email"
-            required
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold uppercase tracking-widest text-slate-300">
-            密码
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40"
-            placeholder={mode === "signin" ? "输入密码" : "设置登录密码"}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={6}
-          />
-        </div>
-        {error && (
-          <p className="rounded-2xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-xs text-red-200">
-            {error}
+    <div className="relative h-[600px] w-full max-w-4xl overflow-hidden rounded-[16px] border border-blue-200 bg-white shadow-[0_40px_120px_-30px_rgba(56,189,248,0.35)]">
+      <div
+        className={`absolute top-0 flex h-full w-1/3 flex-col items-center justify-center bg-gradient-to-br from-blue-300 to-blue-500 p-12 text-white transition-all duration-700 ease-in-out ${
+          isSignIn ? "left-0" : "left-2/3"
+        } ${isSignIn ? "rounded-l-[16px]" : "rounded-r-[16px]"}`}
+      >
+        <div className="text-center">
+          <div className="mb-8 text-xl font-semibold">51 Talk</div>
+          <h2 className="mb-4 text-4xl font-bold">
+            {isSignIn ? "Hey There!" : "Welcome!"}
+          </h2>
+          <p className="mb-2 text-lg opacity-90">
+            {isSignIn ? "Welcome Back." : "Join us today."}
           </p>
-        )}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex w-full items-center justify-center rounded-2xl bg-white/90 px-4 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-sky-500/20 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting
-            ? mode === "signin"
-              ? "正在登录..."
-              : "正在创建..."
-            : mode === "signin"
-              ? "登录"
-              : "注册并登录"}
-        </button>
-      </form>
-      <div className="mt-6 flex items-center justify-between text-xs text-slate-300">
-        <span>{mode === "signin" ? "还没有账号？" : "已经拥有账号？"}</span>
-        <button
-          type="button"
-          onClick={toggleMode}
-          className="font-semibold text-white transition hover:text-sky-200"
-        >
-          {mode === "signin" ? "立即注册" : "返回登录"}
-        </button>
+          <p className="mb-8 text-base opacity-80">
+            {isSignIn
+              ? "You are just one step away to your feed."
+              : "Start your journey with us."}
+          </p>
+
+          <div className="mt-12">
+            <p className="mb-4 text-sm opacity-90">
+              {isSignIn ? "Don't have an account?" : "Already have an account?"}
+            </p>
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="rounded-full border-2 border-white px-8 py-3 font-medium transition-all duration-300 hover:bg-white hover:text-indigo-600"
+            >
+              {isSignIn ? "Sign Up" : "Sign In"}
+            </button>
+          </div>
+        </div>
       </div>
-    </section>
+
+      <div
+        className={`absolute top-0 h-full w-2/3 transition-all duration-700 ease-in-out ${
+          isSignIn ? "left-1/3" : "left-0"
+        } ${isSignIn ? "rounded-r-[16px] rounded-l-none" : "rounded-l-[16px] rounded-r-none"}`}
+      >
+        <div className="flex h-full flex-col items-center justify-center bg-white p-16 text-gray-800">
+          <h3 className="mb-8 text-3xl font-bold">
+            {isSignIn ? "SIGN IN" : "SIGN UP"}
+          </h3>
+
+          <form className="w-full max-w-sm space-y-6" onSubmit={handleSubmit}>
+            {!isSignIn && (
+              <div>
+                <label className="mb-2 block text-sm text-gray-600">Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Your name"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  autoComplete="name"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="mb-2 block text-sm text-gray-600">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="user@example.com"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                autoComplete="email"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-gray-600">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                autoComplete={isSignIn ? "current-password" : "new-password"}
+                required
+                minLength={6}
+              />
+            </div>
+
+            {error && (
+              <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-500">
+                {error}
+              </p>
+            )}
+
+            {isSignIn && (
+              <div className="flex items-center justify-between text-sm text-gray-600">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                    className="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Keep me logged in
+                </label>
+                <button
+                  type="button"
+                  className="text-orange-500 transition hover:text-orange-600"
+                  onClick={handleForgotPassword}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-full bg-indigo-600 py-3 text-lg font-medium text-white shadow-lg transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSubmitting
+                ? isSignIn
+                  ? "正在登录..."
+                  : "正在创建..."
+                : isSignIn
+                  ? "登录"
+                  : "注册并登录"
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }
