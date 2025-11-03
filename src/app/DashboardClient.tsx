@@ -141,7 +141,7 @@ export function DashboardClient() {
               </Link>
             ) : (
               <div className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 font-medium text-white">
-                🎉 恭喜完成所有模块
+                🎉 恭喜完成所有学习模块
               </div>
             )}
           </div>
