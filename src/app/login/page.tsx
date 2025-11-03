@@ -269,7 +269,7 @@ function AuthContainer({
                   : "正在创建..."
                 : isSignIn
                   ? "登录"
-                  : "注册并登录"
+                  : "注册并登录"}
             </button>
           </form>
         </div>
