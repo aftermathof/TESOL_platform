@@ -15,7 +15,7 @@ export type LearningModule = {
 
 export type QuizQuestion = {
   id: string;
-  type: "single" | "multiple" | "text";
+  type: "single" | "multiple" | "blank" | "short";
   prompt: string;
   options?: string[];
   answer?: string | string[];
@@ -25,7 +25,7 @@ export type QuizQuestion = {
 export type Quiz = {
   id: string;
   title: string;
-  duration: number;
+  duration: number | null;
   questions: QuizQuestion[];
 };
 
@@ -121,31 +121,144 @@ export const mockLearningModules: LearningModule[] = [
 
 export const mockQuiz: Quiz = {
   id: "quiz-1",
-  title: "Module 1 Knowledge Check",
-  duration: 20,
+  title: "51Talk TESOL Certification · 综合测验",
+  duration: 90,
   questions: [
     {
       id: "q1",
       type: "single",
       prompt:
-        "Which strategy best supports differentiated instruction in a TESOL classroom?",
+        "以下哪一项最能体现交际法（Communicative Language Teaching）的核心目标？",
       options: [
-        "Using the same worksheet for every learner",
-        "Allowing learners to choose between discussion or writing tasks",
-        "Prioritising grammar accuracy over communication",
-        "Skipping warm-up activities to save time",
+        "通过大量语法操练帮助学生记忆规则",
+        "让学生在真实语境中使用语言完成任务",
+        "强调准确朗读教材中的对话内容",
+        "要求学生完成大篇幅的语法翻译作业",
       ],
-      answer: "Allowing learners to choose between discussion or writing tasks",
+      answer: "让学生在真实语境中使用语言完成任务",
       explanation:
-        "Providing modality choices allows learners to engage with materials via their strengths, supporting differentiation.",
+        "交际法强调真实语境与意义协商，目标是提升学生在实际交流中的语言运用能力。",
     },
     {
       id: "q2",
-      type: "text",
+      type: "multiple",
       prompt:
-        "Describe one technique you would use to maintain engagement during an online TESOL session.",
+        "在设计课堂热身活动（Warm-up）时，下列做法中哪些可以有效激发学生参与度？（多选）",
+      options: [
+        "设置与主题相关的快速配对游戏",
+        "让学生单独默写上一节课的单词",
+        "使用图片或短视频引入话题",
+        "让学生分享与主题相关的个人经历",
+      ],
+      answer: [
+        "设置与主题相关的快速配对游戏",
+        "使用图片或短视频引入话题",
+        "让学生分享与主题相关的个人经历",
+      ],
       explanation:
-        "Techniques include breakout rooms, interactive polls, targeted questioning, or live annotation.",
+        "热身应建立情境、激活背景知识并鼓励互动。纯粹的静态默写不利于调动情绪，也不符合热身目的。",
+    },
+    {
+      id: "q3",
+      type: "single",
+      prompt:
+        "在一节听力课中，教师播放音频前安排预测活动，其主要目的是：",
+      options: [
+        "提升学生的发音准确度",
+        "降低学生的焦虑感并激活背景知识",
+        "检验学生是否完成课前作业",
+        "延长课堂时长以完成教学进度",
+      ],
+      answer: "降低学生的焦虑感并激活背景知识",
+      explanation:
+        "预测活动帮助学生提前建立语境，启用相关背景知识，从而降低理解障碍。",
+    },
+    {
+      id: "q4",
+      type: "blank",
+      prompt:
+        "在任务型教学（Task-based Language Teaching）中，任务完成后用于语言总结和反馈的环节通常被称为 ________。",
+      answer: "language focus",
+      explanation:
+        "任务后（Post-task）阶段的 language focus 用于整理语言点、进行纠错与升华。",
+    },
+    {
+      id: "q5",
+      type: "multiple",
+      prompt:
+        "以下哪些反馈策略适合在口语课堂中支持学生的自我纠错？（多选）",
+      options: [
+        "重述学生话语并强调正确形式",
+        "直接指出错误并给出正确答案",
+        "使用提示语引导学生重新表达",
+        "让同伴先给出改进建议",
+      ],
+      answer: [
+        "重述学生话语并强调正确形式",
+        "使用提示语引导学生重新表达",
+        "让同伴先给出改进建议",
+      ],
+      explanation:
+        "重述、提示与同伴互助都能促使学生意识到底层问题并进行自我修正，直接给答案容易削弱反思机会。",
+    },
+    {
+      id: "q6",
+      type: "blank",
+      prompt:
+        "课堂管理中，若教师通过预先约定的手势或视觉信号来提醒课堂纪律，这种策略被称为 ________ cue。",
+      answer: "nonverbal",
+      explanation:
+        "非语言提示（nonverbal cue）利用手势、眼神或视觉符号维持秩序，降低干扰。",
+    },
+    {
+      id: "q7",
+      type: "single",
+      prompt:
+        "在阅读课的教学流程中，下列哪一项最适合安排在 While-reading 阶段？",
+      options: [
+        "根据标题预测文章内容",
+        "扫描文本获取特定信息",
+        "讨论主题相关的个人经历",
+        "制作词汇网络图复习关键词",
+      ],
+      answer: "扫描文本获取特定信息",
+      explanation:
+        "While-reading 阶段聚焦于文本理解策略（如扫读、略读），预测与讨论通常在 Pre-reading 进行。",
+    },
+    {
+      id: "q8",
+      type: "multiple",
+      prompt:
+        "在 51Talk 的在线课堂中，为确保学习者持续参与，下列做法哪些更符合有效的课堂互动原则？（多选）",
+      options: [
+        "每 5-7 分钟切换一次活动形式",
+        "仅使用 PPT 展示信息，避免互动工具",
+        "在任务说明中提供明确的示例或演示",
+        "利用即时投票或表情反馈收集意见",
+      ],
+      answer: [
+        "每 5-7 分钟切换一次活动形式",
+        "在任务说明中提供明确的示例或演示",
+        "利用即时投票或表情反馈收集意见",
+      ],
+      explanation:
+        "多元活动、清晰示例与及时反馈可保持学生注意力并提升互动体验，单向 PPT 输出容易降低参与度。",
+    },
+    {
+      id: "q9",
+      type: "short",
+      prompt:
+        "请结合自身教学经验，写出一项可帮助学习者自主规划学习目标的策略，并说明实施步骤。",
+      explanation:
+        "建议包括：提供学习计划模版、引导学生设定 SMART 目标、定期反思等。",
+    },
+    {
+      id: "q10",
+      type: "short",
+      prompt:
+        "在大班在线课堂中，如果出现部分学生持续沉默的情况，你会如何通过课堂设计鼓励他们主动发言？请描述你的方案。",
+      explanation:
+        "可以提及分组讨论、分配角色、使用匿名提问板等策略，并说明反馈机制。",
     },
   ],
 };
