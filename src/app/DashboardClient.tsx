@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { fetchLearningModules, type LearningModuleRecord } from "@/lib/learningModules";
-import { getProgressSnapshot } from "@/lib/dataService";
 import type { ProgressSnapshot } from "@/data/mockData";
+import { useAuth } from "@/components/AuthProvider";
 
 const statusMap: Record<string, string> = {
   not_submitted: "未提交",
@@ -15,11 +15,45 @@ const statusMap: Record<string, string> = {
   available: "可下载",
 };
 
+const quizStatusLabel: Record<
+  "not_started" | "pending_review" | "approved" | "rejected",
+  string
+> = {
+  not_started: "尚未测试",
+  pending_review: "待审核",
+  approved: "已审核",
+  rejected: "需复查",
+};
+
 type AsyncState<T> = {
   data: T | null;
   loading: boolean;
   error: string | null;
 };
+
+async function fetchProgress(accessToken?: string): Promise<ProgressSnapshot> {
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch("/api/progress", {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      typeof errorBody?.error === "string"
+        ? errorBody.error
+        : `获取进度失败：${response.status}`;
+    throw new Error(message);
+  }
+
+  const payload = (await response.json()) as { progress: ProgressSnapshot };
+  return payload.progress;
+}
 
 function formatModuleDisplay(module: LearningModuleRecord, index: number) {
   if (module.orderIndex != null) {
@@ -29,6 +63,7 @@ function formatModuleDisplay(module: LearningModuleRecord, index: number) {
 }
 
 export function DashboardClient() {
+  const { session } = useAuth();
   const [modulesState, setModulesState] = useState<AsyncState<LearningModuleRecord[]>>({
     data: null,
     loading: true,
@@ -46,7 +81,7 @@ export function DashboardClient() {
       try {
         const [fetchedModules, snapshot] = await Promise.all([
           fetchLearningModules(),
-          getProgressSnapshot(),
+          fetchProgress(session?.access_token ?? undefined),
         ]);
         if (cancelled) return;
         setModulesState({ data: fetchedModules, loading: false, error: null });
@@ -62,7 +97,7 @@ export function DashboardClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [session?.access_token]);
 
   const modules = useMemo(() => modulesState.data ?? [], [modulesState.data]);
   const totalModules = modules.length;
@@ -77,7 +112,9 @@ export function DashboardClient() {
     totalModules > 0 ? (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">已完成 {completedModules}</span>
-        <span className="mt-2 text-lg font-semibold text-zinc-500">未完成 {pendingModules}</span>
+        <span className="mt-2 text-lg font-semibold text-zinc-500">
+          未完成 {pendingModules}
+        </span>
       </div>
     ) : (
       <span className="text-3xl font-bold text-zinc-900">暂无学习模块</span>
@@ -86,13 +123,12 @@ export function DashboardClient() {
   const nextModule = useMemo(() => {
     if (modules.length === 0) return null;
     const firstIncomplete = modules.find((module) => !module.completed);
-    return firstIncomplete ?? null; // 当所有模块都完成时返回null
+    return firstIncomplete ?? null;
   }, [modules]);
 
   const nextModuleDisplay = useMemo(() => {
     if (!nextModule) {
-      // 如果没有未完成的模块，检查是否所有模块都已完成
-      if (modules.length > 0 && modules.every(module => module.completed)) {
+      if (modules.length > 0 && modules.every((module) => module.completed)) {
         return "已全部完成";
       }
       return "";
@@ -114,28 +150,61 @@ export function DashboardClient() {
 
   if (modulesState.error) {
     return (
-      <div className="flex min-h-[320px] flex-col items-center justify中心 gap-4 rounded-2xl border border-red-200 bg-red-50/80 p-8 text-sm text-red-700 shadow-sm">
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-2xl border border-red-200 bg-red-50/80 p-8 text-sm text-red-700 shadow-sm">
         <p>{modulesState.error}</p>
       </div>
     );
   }
 
+  const quizSnapshot = progressState.data?.quiz ?? {
+    attempts: 0,
+    highestFinalScore: null,
+    pendingReviewCount: 0,
+    latestStatus: "not_started" as const,
+  };
+
+  const quizValue: ReactNode =
+    quizSnapshot.attempts === 0 ? (
+      <span className="text-lg font-semibold text-zinc-600">尚未完成测试</span>
+    ) : (
+      <div className="flex flex-col leading-tight">
+        <span className="text-3xl font-bold text-zinc-900">
+          完成 {quizSnapshot.attempts} 次
+        </span>
+        <span className="mt-2 text-lg font-semibold text-zinc-500">
+          最高分：
+          {quizSnapshot.highestFinalScore != null
+            ? `${quizSnapshot.highestFinalScore.toFixed(1)} 分`
+            : "等待审核"}
+        </span>
+      </div>
+    );
+
+  const quizDescription =
+    quizSnapshot.pendingReviewCount > 0
+      ? `有 ${quizSnapshot.pendingReviewCount} 份答卷待审核`
+      : `最新状态：${quizStatusLabel[quizSnapshot.latestStatus]}`;
+
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h2 className="text-2xl font-semibold text-zinc-900">欢迎回来，继续你的 TESOL 学习旅程</h2>
+        <h2 className="text-2xl font-semibold text-zinc-900">
+          欢迎回来，继续你的 TESOL 学习旅程
+        </h2>
         {(nextModule || nextModuleDisplay === "已全部完成") && (
           <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-6 text-sm text-sky-700 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold text-sky-900">
-                {nextModuleDisplay === "已全部完成" ? "学习状态：已全部完成" : `下一学习任务：${nextModuleDisplay}`}
+                {nextModuleDisplay === "已全部完成"
+                  ? "学习状态：已全部完成"
+                  : `下一学习任务：${nextModuleDisplay}`}
               </p>
               <p>当前完成进度：{completionLabel}</p>
             </div>
             {nextModule ? (
               <Link
                 href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
-                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium !text-white hover:bg-[rgb(0,92,230)] hover:!text-white focus-visible:!text-white active:!text-white visited:!text-white"
+                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgb(0,92,230)] focus-visible:outline-none"
               >
                 前往学习模块
               </Link>
@@ -150,11 +219,7 @@ export function DashboardClient() {
 
       <section className="grid gap-4 md:grid-cols-4">
         <ProgressCard title="学习进度" value={completionValue} />
-        <ProgressCard
-          title="待完成测验"
-          value={(progressState.data?.pendingQuizzes ?? 0).toString()}
-          description="仍需完成的测验数量"
-        />
+        <ProgressCard title="测验情况" value={quizValue} description={quizDescription} />
         <ProgressCard
           title="Teaching Plan"
           value={statusMap[progressState.data?.teachingPlanStatus ?? "not_submitted"]}

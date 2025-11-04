@@ -46,16 +46,60 @@ export type QuizSubmissionAnswer = {
   aiFeedback?: string | null;
   manualOverride?: boolean | null;
   manualFeedback?: string | null;
+  maxPoints: number;
+  awardedPoints?: number | null;
 };
 
 export type QuizSubmission = {
   id: string;
   quizId: string;
   score: number | null;
+  maxScore: number | null;
+  passThreshold: number | null;
+  finalScore: number | null;
+  status: "pending_review" | "approved" | "rejected";
+  passed: boolean | null;
   totalItems: number | null;
   aiOverallScore: number | null;
   aiSummary: string | null;
   createdAt: string;
+  reviewedAt: string | null;
+};
+
+export type ShortAnswerReviewAnswer = {
+  answerId: string;
+  questionId: string;
+  prompt: string;
+  response: string | string[] | null;
+  aiScore: number | null;
+  aiFeedback: string | null;
+  maxPoints: number;
+  awardedPoints: number | null;
+  manualOverride: boolean | null;
+  manualFeedback: string | null;
+};
+
+export type ShortAnswerReview = {
+  submissionId: string;
+  quizId: string;
+  quizTitle: string | null;
+  userId: string;
+  createdAt: string;
+  score: number | null;
+  maxScore: number | null;
+  passThreshold: number | null;
+  status: "pending_review" | "approved" | "rejected";
+  answers: ShortAnswerReviewAnswer[];
+};
+
+export type ReviewUpdatePayload = {
+  status: "approved" | "rejected" | "pending_review";
+  reviewNotes?: string | null;
+  answers: Array<{
+    answerId: string;
+    awardedPoints: number;
+    manualFeedback?: string | null;
+  }>;
 };
 
 export type TeachingPlanSubmission = {

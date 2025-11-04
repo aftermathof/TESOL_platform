@@ -43,9 +43,16 @@ export type CertificateInfo = {
   downloadUrl?: string;
 };
 
+export type QuizProgress = {
+  attempts: number;
+  highestFinalScore: number | null;
+  pendingReviewCount: number;
+  latestStatus: "not_started" | "pending_review" | "approved" | "rejected";
+};
+
 export type ProgressSnapshot = {
   learningCompletion: number;
-  pendingQuizzes: number;
+  quiz: QuizProgress;
   teachingPlanStatus: "not_submitted" | "in_review" | "approved";
   certificateStatus: "not_eligible" | "generating" | "available";
 };
@@ -290,7 +297,12 @@ export const mockCertificate: CertificateInfo = {
 
 export const mockProgress: ProgressSnapshot = {
   learningCompletion: 0.48,
-  pendingQuizzes: 1,
+  quiz: {
+    attempts: 0,
+    highestFinalScore: null,
+    pendingReviewCount: 0,
+    latestStatus: "not_started",
+  },
   teachingPlanStatus: "in_review",
   certificateStatus: "not_eligible",
 };

@@ -34,10 +34,18 @@ create table if not exists public.quiz_submissions (
   id uuid primary key default gen_random_uuid(),
   quiz_id uuid not null references public.quiz_bank(id) on delete cascade,
   user_id uuid not null,
-  score numeric(5,2),
+  score numeric(6,2),
+  max_score numeric(6,2),
+  pass_threshold numeric(6,2) default 60,
+  final_score numeric(6,2),
+  status text not null default 'pending_review',
+  passed boolean,
   total_items integer,
   ai_overall_score numeric(5,2),
   ai_summary text,
+  reviewed_at timestamptz,
+  reviewed_by uuid,
+  review_notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint quiz_submissions_user_idx unique (quiz_id, user_id, created_at)
@@ -52,6 +60,8 @@ create table if not exists public.quiz_submission_answers (
   is_correct boolean,
   ai_score numeric(5,2),
   ai_feedback text,
+  max_points numeric(6,2) not null default 0,
+  awarded_points numeric(6,2),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   manual_override boolean default false,
@@ -85,6 +95,25 @@ create index if not exists quiz_questions_quiz_id_idx on public.quiz_questions (
 create index if not exists quiz_submissions_user_idx2 on public.quiz_submissions (user_id, created_at desc);
 create index if not exists quiz_submission_answers_submission_idx on public.quiz_submission_answers (submission_id);
 create index if not exists teaching_plan_submissions_user_idx on public.teaching_plan_submissions (user_id, created_at desc);
+
+alter table public.quiz_submissions
+  alter column score type numeric(6,2),
+  add column if not exists max_score numeric(6,2),
+  add column if not exists pass_threshold numeric(6,2) default 60,
+  add column if not exists final_score numeric(6,2),
+  add column if not exists status text not null default 'pending_review',
+  add column if not exists passed boolean,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists reviewed_by uuid,
+  add column if not exists review_notes text;
+
+alter table public.quiz_submission_answers
+  add column if not exists max_points numeric(6,2) default 0,
+  add column if not exists awarded_points numeric(6,2);
+
+update public.quiz_submissions
+  set status = 'pending_review'
+  where status is null;
 
 alter table public.quiz_submissions
   enable row level security;

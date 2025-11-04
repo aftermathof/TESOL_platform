@@ -16,6 +16,8 @@ const submissionSchema = z.object({
     .default({}),
 });
 
+const PASS_THRESHOLD = 60;
+
 export async function GET() {
   const { quiz, questions } = await getActiveQuiz();
   return NextResponse.json({
@@ -54,29 +56,45 @@ export async function POST(request: Request) {
   }
 
   const grading = await gradeAnswers(parseResult.data.answers, questions);
-
   const userId = await resolveUserId(request);
+
+  let submissionId: string | null = null;
   if (userId) {
     try {
-      await saveQuizSubmission({
+      const submission = await saveQuizSubmission({
         userId,
         quizId: quiz.id,
-        score: grading.score,
+        rawScore: grading.rawScore,
+        maxScore: grading.maxScore,
+        passThreshold: grading.passThreshold,
+        status: "pending_review",
+        passed: null,
         totalItems: questions.length,
         aiOverallScore: grading.averageAiScore,
         aiSummary: grading.aiSummary,
         answers: grading.persistedAnswers,
       });
+      submissionId = submission.id;
     } catch (error) {
       console.error("[quiz] Failed to persist submission:", error);
     }
   }
 
   return NextResponse.json({
-    score: grading.score,
-    total: questions.length,
-    feedback: grading.feedback,
+    submissionId,
+    status: "pending_review" as const,
+    passThreshold: grading.passThreshold,
+    maxScore: grading.maxScore,
     aiSummary: grading.aiSummary,
+    answers: grading.persistedAnswers.map((answer) => ({
+      questionId: answer.questionId,
+      response: answer.response,
+      isObjective: answer.isObjective,
+      aiScore: answer.aiScore ?? null,
+      aiFeedback: answer.aiFeedback ?? null,
+    })),
+    message:
+      "答卷已提交，成绩将在管理员审核后公布，请耐心等待审核结果。",
   });
 }
 
@@ -84,31 +102,22 @@ async function gradeAnswers(
   answers: Record<string, string | string[]>,
   questions: QuizQuestion[]
 ): Promise<{
-  score: number;
-  feedback: {
-    id: string;
-    correct: boolean;
-    explanation?: string;
-    aiScore?: number | null;
-    aiFeedback?: string | null;
-  }[];
+  rawScore: number;
+  maxScore: number;
+  passThreshold: number;
   aiSummary: string | null;
   averageAiScore: number | null;
   persistedAnswers: QuizSubmissionAnswer[];
 }> {
-  let score = 0;
-  const feedback: {
-    id: string;
-    correct: boolean;
-    explanation?: string;
-    aiScore?: number | null;
-    aiFeedback?: string | null;
-  }[] = [];
+  const scoringPlan = buildScoringPlan(questions);
   const persistedAnswers: QuizSubmissionAnswer[] = [];
   const aiFeedbackSnippets: string[] = [];
   const aiScores: number[] = [];
 
+  let rawScore = 0;
+
   for (const question of questions) {
+    const weight = scoringPlan.get(question.id) ?? 1;
     const userAnswer = answers[question.id];
     const record: QuizSubmissionAnswer = {
       questionId: question.id,
@@ -117,6 +126,8 @@ async function gradeAnswers(
       isCorrect: null,
       aiScore: null,
       aiFeedback: null,
+      maxPoints: weight,
+      awardedPoints: 0,
     };
 
     if (question.type === "single") {
@@ -124,26 +135,18 @@ async function gradeAnswers(
         typeof question.answer === "string" ? question.answer : null;
       const correct =
         typeof userAnswer === "string" && userAnswer === expected;
-      if (correct) score += 1;
       record.isCorrect = correct;
-      feedback.push({
-        id: question.id,
-        correct,
-        explanation: question.explanation,
-      });
+      record.awardedPoints = correct ? weight : 0;
+      rawScore += record.awardedPoints;
     } else if (question.type === "multiple") {
       const expected = Array.isArray(question.answer) ? question.answer : [];
       const received = Array.isArray(userAnswer) ? userAnswer : [];
       const correct =
         expected.length === received.length &&
         expected.every((item) => received.includes(item));
-      if (correct) score += 1;
       record.isCorrect = correct;
-      feedback.push({
-        id: question.id,
-        correct,
-        explanation: question.explanation,
-      });
+      record.awardedPoints = correct ? weight : 0;
+      rawScore += record.awardedPoints;
     } else if (question.type === "blank") {
       const expected = Array.isArray(question.answer)
         ? question.answer.map((item) => item.toString().trim().toLowerCase())
@@ -155,13 +158,9 @@ async function gradeAnswers(
       const correct =
         received.length > 0 &&
         (expected.length === 0 || expected.includes(received));
-      if (correct) score += 1;
       record.isCorrect = correct;
-      feedback.push({
-        id: question.id,
-        correct,
-        explanation: question.explanation,
-      });
+      record.awardedPoints = correct ? weight : 0;
+      rawScore += record.awardedPoints;
     } else {
       const userText =
         typeof userAnswer === "string" ? userAnswer.trim() : "";
@@ -169,7 +168,7 @@ async function gradeAnswers(
         typeof question.answer === "string"
           ? question.answer
           : Array.isArray(question.answer)
-          ? question.answer.join("；")
+          ? question.answer.join(" / ")
           : null;
       const aiResult = await scoreSubjectiveAnswer({
         question: question.prompt,
@@ -179,36 +178,32 @@ async function gradeAnswers(
       record.isObjective = false;
       record.aiScore = aiResult.aiScore;
       record.aiFeedback = aiResult.aiFeedback ?? null;
-      const correct =
-        typeof aiResult.aiScore === "number"
-          ? aiResult.aiScore >= 60
-          : userText.length > 0;
-      if (correct) score += 1;
-      record.isCorrect = correct;
-      feedback.push({
-        id: question.id,
-        correct,
-        explanation: question.explanation,
-        aiScore: aiResult.aiScore,
-        aiFeedback: aiResult.aiFeedback ?? undefined,
-      });
+      if (typeof aiResult.aiScore === "number") {
+        const awarded = (aiResult.aiScore / 100) * weight;
+        record.awardedPoints = Number(awarded.toFixed(2));
+        rawScore += record.awardedPoints;
+        aiScores.push(aiResult.aiScore);
+      }
       if (aiResult.aiFeedback) {
         aiFeedbackSnippets.push(aiResult.aiFeedback);
-      }
-      if (typeof aiResult.aiScore === "number") {
-        aiScores.push(aiResult.aiScore);
       }
     }
 
     persistedAnswers.push(record);
   }
 
+  const maxScore = Array.from(scoringPlan.values()).reduce(
+    (acc, value) => acc + value,
+    0
+  );
+
   return {
-    score,
-    feedback,
+    rawScore: Number(rawScore.toFixed(2)),
+    maxScore,
+    passThreshold: PASS_THRESHOLD,
     aiSummary:
       aiFeedbackSnippets.length > 0
-        ? aiFeedbackSnippets.slice(0, 3).join("；")
+        ? aiFeedbackSnippets.slice(0, 3).join(" / ")
         : null,
     averageAiScore:
       aiScores.length > 0
@@ -216,6 +211,21 @@ async function gradeAnswers(
         : null,
     persistedAnswers,
   };
+}
+
+function buildScoringPlan(questions: QuizQuestion[]): Map<string, number> {
+  const plan = new Map<string, number>();
+  const lastIndex = questions.length - 1;
+
+  questions.forEach((question, index) => {
+    if (question.type === "short") {
+      plan.set(question.id, index === lastIndex ? 50 : 10);
+    } else {
+      plan.set(question.id, 1);
+    }
+  });
+
+  return plan;
 }
 
 async function resolveUserId(request: Request): Promise<string | null> {

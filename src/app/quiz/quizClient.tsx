@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchLearningModules } from "@/lib/learningModules";
 import type { Quiz, QuizQuestion } from "./page";
 
-type SubmissionResult = {
-  score: number;
-  total: number;
-  feedback: {
-    id: string;
-    correct: boolean;
-    explanation?: string;
+type SubmissionReceipt = {
+  submissionId: string | null;
+  status: "pending_review" | "approved" | "rejected";
+  passThreshold: number;
+  maxScore: number;
+  answers: {
+    questionId: string;
+    response: string | string[] | null;
+    isObjective: boolean;
     aiScore?: number | null;
     aiFeedback?: string | null;
   }[];
   aiSummary?: string | null;
+  message: string;
 };
 
 const TEST_DURATION_SECONDS = 90 * 60;
@@ -24,7 +27,7 @@ const TEST_DURATION_SECONDS = 90 * 60;
 export function QuizClient({ quiz }: { quiz: Quiz | null }) {
   const { session } = useAuth();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [showIntroModal, setShowIntroModal] = useState(false);
@@ -36,6 +39,70 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
   const [autoSubmitting, setAutoSubmitting] = useState(false);
 
   const totalQuestions = quiz?.questions.length ?? 0;
+
+  const submitQuiz = useCallback(async (autoTriggered: boolean) => {
+    if (!quiz) return;
+    if (isSubmitting) return;
+
+    setSubmitting(true);
+    setShowConfirmModal(false);
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+
+    let submissionSucceeded = false;
+
+    try {
+      const response = await fetch("/api/quiz", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ quizId: quiz.id, answers }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setReceipt({
+          submissionId: null,
+          status: "pending_review",
+          passThreshold: 60,
+          maxScore: 0,
+          answers: [],
+          aiSummary: null,
+          message: data.error ?? "提交失败，请检查答案格式后重试。",
+        });
+      } else {
+        const data = (await response.json()) as SubmissionReceipt;
+        setReceipt(data);
+        submissionSucceeded = true;
+      }
+    } catch (error) {
+      console.error("[QuizClient] submit error:", error);
+      setReceipt({
+        submissionId: null,
+        status: "pending_review",
+        passThreshold: 60,
+        maxScore: quiz.questions.length,
+        answers: [],
+        aiSummary: null,
+        message: "网络异常，提交失败，请稍后重试。",
+      });
+    } finally {
+      setSubmitting(false);
+      setAutoSubmitting(false);
+      if (submissionSucceeded || autoTriggered) {
+        setHasStarted(false);
+        setShowIntroModal(false);
+        setTimeLeft(TEST_DURATION_SECONDS);
+        setAnswers({});
+      }
+    }
+  }, [answers, isSubmitting, quiz, session?.access_token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +149,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
   }, [session?.user]);
 
   useEffect(() => {
-    if (!hasStarted || result) {
+    if (!hasStarted || receipt) {
       return;
     }
 
@@ -101,7 +168,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
     return () => {
       window.clearInterval(timer);
     };
-  }, [hasStarted, result]);
+  }, [hasStarted, receipt, submitQuiz]);
 
   const countdownLabel = useMemo(() => formatTime(timeLeft), [timeLeft]);
 
@@ -231,12 +298,12 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         </section>
       )}
 
-      {!hasStarted && result ? (
-        <ResultPanel
-          result={result}
+      {!hasStarted && receipt ? (
+        <SubmissionReviewPanel
+          receipt={receipt}
           questions={quiz.questions}
           onReset={() => {
-            setResult(null);
+            setReceipt(null);
           }}
         />
       ) : null}
@@ -249,7 +316,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
           onConfirm={() => {
             setHasStarted(true);
             setShowIntroModal(false);
-            setResult(null);
+            setReceipt(null);
             setAnswers({});
             setTimeLeft(TEST_DURATION_SECONDS);
             setAutoSubmitting(false);
@@ -267,73 +334,6 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
     </div>
   );
 
-  async function submitQuiz(autoTriggered: boolean) {
-    if (!quiz) return;
-    if (isSubmitting) return;
-
-    setSubmitting(true);
-    setShowConfirmModal(false);
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (session?.access_token) {
-      headers.Authorization = `Bearer ${session.access_token}`;
-    }
-
-    let submissionSucceeded = false;
-
-    try {
-      const response = await fetch("/api/quiz", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ quizId: quiz.id, answers }),
-      });
-
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        setResult({
-          score: 0,
-          total: totalQuestions,
-          feedback: [
-            {
-              id: "error",
-              correct: false,
-              explanation: data.error ?? "提交失败，请检查答案格式后重试。",
-            },
-          ],
-        });
-      } else {
-        const data = (await response.json()) as SubmissionResult;
-        setResult(data);
-        submissionSucceeded = true;
-      }
-    } catch (error) {
-      console.error("[QuizClient] submit error:", error);
-      setResult({
-        score: 0,
-        total: totalQuestions,
-        feedback: [
-          {
-            id: "error",
-            correct: false,
-            explanation: "网络异常，提交失败，请稍后重试。",
-          },
-        ],
-      });
-    } finally {
-      setSubmitting(false);
-      setAutoSubmitting(false);
-      if (submissionSucceeded || autoTriggered) {
-        setHasStarted(false);
-        setShowIntroModal(false);
-        setTimeLeft(TEST_DURATION_SECONDS);
-        setAnswers({});
-      }
-    }
-  }
 }
 
 function QuestionItem({
@@ -538,55 +538,50 @@ function ConfirmModal({
   );
 }
 
-function ResultPanel({
-  result,
+function SubmissionReviewPanel({
+  receipt,
   questions,
   onReset,
 }: {
-  result: SubmissionResult;
+  receipt: SubmissionReceipt;
   questions: QuizQuestion[];
   onReset: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 shadow-sm">
+    <section className="rounded-2xl border border-sky-200 bg-sky-50/70 p-6 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h4 className="text-lg font-semibold text-emerald-800">
-          本次成绩：{result.score}/{result.total}
+        <h4 className="text-lg font-semibold text-sky-900">
+          答卷已提交，等待管理员审核
         </h4>
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex items-center rounded-full border border-emerald-500 px-4 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-500/10"
+          className="inline-flex items-center rounded-full border border-sky-500 px-4 py-1 text-sm font-semibold text-sky-700 hover:bg-sky-500/10"
         >
-          收起成绩
+          收起答卷
         </button>
       </div>
+      <p className="mt-3 text-sm text-sky-700">{receipt.message}</p>
       <ul className="mt-4 space-y-3 text-sm">
-        {result.feedback.map((feedback) => {
-          const question = questions.find((item) => item.id === feedback.id);
+        {receipt.answers.map((answer) => {
+          const question = questions.find((item) => item.id === answer.questionId);
           if (!question) return null;
+          const renderedResponse = formatAnswerValue(answer.response);
 
           return (
             <li
-              key={feedback.id}
-              className="rounded-xl border border-emerald-100 bg-white/70 p-4"
+              key={answer.questionId}
+              className="rounded-xl border border-sky-100 bg-white/70 p-4 text-sky-800"
             >
-              <p className="font-semibold text-emerald-700">
-                {question.prompt}
+              <p className="font-semibold text-sky-900">{question.prompt}</p>
+              <p className="mt-2 text-xs text-sky-700">
+                我的回答：{renderedResponse || "（未作答）"}
               </p>
-              <p className="mt-1 text-xs text-emerald-600">
-                {feedback.correct ? "回答正确" : "待优化"}
-              </p>
-              {feedback.explanation && (
-                <p className="mt-2 text-xs text-emerald-600">
-                  解析：{feedback.explanation}
-                </p>
-              )}
-              {feedback.aiFeedback && (
-                <p className="mt-2 text-xs text-emerald-600">
-                  AI 反馈：{feedback.aiFeedback}
-                  {typeof feedback.aiScore === "number"
-                    ? `（评分：${feedback.aiScore.toFixed(1)}）`
+              {answer.aiFeedback && (
+                <p className="mt-2 text-xs text-sky-700">
+                  AI 评价：{answer.aiFeedback}
+                  {typeof answer.aiScore === "number"
+                    ? `（自动评分：${answer.aiScore.toFixed(1)}）`
                     : ""}
                 </p>
               )}
@@ -594,13 +589,26 @@ function ResultPanel({
           );
         })}
       </ul>
-      {result.aiSummary && (
-        <p className="mt-4 rounded-xl border border-emerald-100 bg-white/60 p-4 text-sm text-emerald-700">
-          总结：{result.aiSummary}
+      {receipt.aiSummary && (
+        <p className="mt-4 rounded-xl border border-sky-100 bg-white/60 p-4 text-sm text-sky-800">
+          AI 总结：{receipt.aiSummary}
         </p>
       )}
+      <p className="mt-4 text-xs text-sky-600">
+        最终成绩将在管理员审核后公布，结果可在仪表盘查看。
+      </p>
     </section>
   );
+}
+
+function formatAnswerValue(response: string | string[] | null | undefined): string {
+  if (response == null) {
+    return "";
+  }
+  if (Array.isArray(response)) {
+    return response.join("，");
+  }
+  return response;
 }
 
 function formatTime(totalSeconds: number) {

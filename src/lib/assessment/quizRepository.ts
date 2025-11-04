@@ -99,7 +99,11 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
 export async function saveQuizSubmission(params: {
   userId: string;
   quizId: string;
-  score: number;
+  rawScore: number;
+  maxScore: number;
+  passThreshold: number;
+  status?: "pending_review" | "approved" | "rejected";
+  passed?: boolean | null;
   totalItems: number;
   aiOverallScore?: number | null;
   aiSummary?: string | null;
@@ -115,7 +119,12 @@ export async function saveQuizSubmission(params: {
     .insert({
       quiz_id: params.quizId,
       user_id: params.userId,
-      score: params.score,
+      score: params.rawScore,
+      max_score: params.maxScore,
+      pass_threshold: params.passThreshold,
+      final_score: null,
+      status: params.status ?? "pending_review",
+      passed: params.passed ?? null,
       total_items: params.totalItems,
       ai_overall_score: params.aiOverallScore ?? null,
       ai_summary: params.aiSummary ?? null,
@@ -135,10 +144,16 @@ export async function saveQuizSubmission(params: {
     id: string;
     quiz_id: string;
     score: number | null;
+    max_score: number | null;
+    pass_threshold: number | null;
+    final_score: number | null;
+    status: "pending_review" | "approved" | "rejected";
+    passed: boolean | null;
     total_items: number | null;
     ai_overall_score: number | null;
     ai_summary: string | null;
     created_at: string;
+    reviewed_at: string | null;
   };
 
   if (params.answers.length > 0) {
@@ -152,6 +167,8 @@ export async function saveQuizSubmission(params: {
       ai_feedback: answer.aiFeedback ?? null,
       manual_override: answer.manualOverride ?? null,
       manual_feedback: answer.manualFeedback ?? null,
+      max_points: answer.maxPoints,
+      awarded_points: answer.awardedPoints ?? null,
     }));
 
     const { error: answerError } = await supabase
@@ -167,9 +184,15 @@ export async function saveQuizSubmission(params: {
     id: submission.id,
     quizId: submission.quiz_id,
     score: submission.score,
+    maxScore: submission.max_score,
+    passThreshold: submission.pass_threshold,
+    finalScore: submission.final_score,
+    status: submission.status,
+    passed: submission.passed,
     totalItems: submission.total_items,
     aiOverallScore: submission.ai_overall_score,
     aiSummary: submission.ai_summary,
     createdAt: submission.created_at,
+    reviewedAt: submission.reviewed_at,
   };
 }
