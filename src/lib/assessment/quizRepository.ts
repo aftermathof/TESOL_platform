@@ -23,6 +23,10 @@ function mapQuestion(record: QuizQuestionRecord): QuizQuestion {
       : undefined,
     answer: record.answer ?? undefined,
     explanation: record.explanation ?? undefined,
+    points:
+      record.points != null && !Number.isNaN(Number(record.points))
+        ? Number(record.points)
+        : undefined,
   };
 }
 
@@ -45,6 +49,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
         options: question.options,
         answer: question.answer,
         explanation: question.explanation,
+        points: typeof question.points === "number" ? question.points : undefined,
       })),
     };
   }
@@ -73,6 +78,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
         options: question.options,
         answer: question.answer,
         explanation: question.explanation,
+        points: typeof question.points === "number" ? question.points : undefined,
       })),
     };
   }
@@ -102,6 +108,7 @@ export async function saveQuizSubmission(params: {
   rawScore: number;
   maxScore: number;
   passThreshold: number;
+  finalScore?: number | null;
   status?: "pending_review" | "approved" | "rejected";
   passed?: boolean | null;
   totalItems: number;
@@ -122,7 +129,8 @@ export async function saveQuizSubmission(params: {
       score: params.rawScore,
       max_score: params.maxScore,
       pass_threshold: params.passThreshold,
-      final_score: null,
+      final_score:
+        typeof params.finalScore === "number" ? params.finalScore : null,
       status: params.status ?? "pending_review",
       passed: params.passed ?? null,
       total_items: params.totalItems,

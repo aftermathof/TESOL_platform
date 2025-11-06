@@ -11,12 +11,18 @@ type SubmissionReceipt = {
   status: "pending_review" | "approved" | "rejected";
   passThreshold: number;
   maxScore: number;
+  score: number | null;
+  finalScore: number | null;
+  passed: boolean | null;
   answers: {
     questionId: string;
     response: string | string[] | null;
     isObjective: boolean;
     aiScore?: number | null;
     aiFeedback?: string | null;
+    awardedPoints?: number | null;
+    maxPoints?: number | null;
+    isCorrect?: boolean | null;
   }[];
   aiSummary?: string | null;
   message: string;
@@ -69,9 +75,12 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         };
         setReceipt({
           submissionId: null,
-          status: "pending_review",
+          status: "rejected",
           passThreshold: 60,
           maxScore: 0,
+          score: null,
+          finalScore: null,
+          passed: null,
           answers: [],
           aiSummary: null,
           message: data.error ?? "提交失败，请检查答案格式后重试。",
@@ -85,9 +94,12 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
       console.error("[QuizClient] submit error:", error);
       setReceipt({
         submissionId: null,
-        status: "pending_review",
+        status: "rejected",
         passThreshold: 60,
         maxScore: quiz.questions.length,
+        score: null,
+        finalScore: null,
+        passed: null,
         answers: [],
         aiSummary: null,
         message: "网络异常，提交失败，请稍后重试。",
@@ -547,12 +559,31 @@ function SubmissionReviewPanel({
   questions: QuizQuestion[];
   onReset: () => void;
 }) {
+  const statusLabel =
+    receipt.status === "approved"
+      ? "通过"
+      : receipt.status === "rejected"
+      ? "未通过"
+      : "处理中";
+  const statusTone =
+    receipt.status === "approved"
+      ? "text-emerald-600"
+      : receipt.status === "rejected"
+      ? "text-red-600"
+      : "text-sky-700";
+
   return (
     <section className="rounded-2xl border border-sky-200 bg-sky-50/70 p-6 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h4 className="text-lg font-semibold text-sky-900">
-          答卷已提交，等待管理员审核
-        </h4>
+        <div>
+          <h4 className="text-lg font-semibold text-sky-900">
+            AI 评分结果：<span className={statusTone}>{statusLabel}</span>
+          </h4>
+          <p className="mt-1 text-sm text-sky-700">
+            总分 {formatScore(receipt.score)} / {formatScore(receipt.maxScore)} · 及格线{" "}
+            {formatScore(receipt.passThreshold)} 分
+          </p>
+        </div>
         <button
           type="button"
           onClick={onReset}
@@ -567,6 +598,12 @@ function SubmissionReviewPanel({
           const question = questions.find((item) => item.id === answer.questionId);
           if (!question) return null;
           const renderedResponse = formatAnswerValue(answer.response);
+          const correctnessLabel =
+            answer.isObjective && typeof answer.isCorrect === "boolean"
+              ? answer.isCorrect
+                ? "判定：正确"
+                : "判定：错误"
+              : null;
 
           return (
             <li
@@ -576,6 +613,10 @@ function SubmissionReviewPanel({
               <p className="font-semibold text-sky-900">{question.prompt}</p>
               <p className="mt-2 text-xs text-sky-700">
                 我的回答：{renderedResponse || "（未作答）"}
+              </p>
+              <p className="mt-2 text-xs text-sky-700">
+                得分：{formatScore(answer.awardedPoints)} / {formatScore(answer.maxPoints)}
+                {correctnessLabel ? ` · ${correctnessLabel}` : ""}
               </p>
               {answer.aiFeedback && (
                 <p className="mt-2 text-xs text-sky-700">
@@ -595,10 +636,18 @@ function SubmissionReviewPanel({
         </p>
       )}
       <p className="mt-4 text-xs text-sky-600">
-        最终成绩将在管理员审核后公布，结果可在仪表盘查看。
+        成绩已自动同步至仪表盘，如需提升得分可重新作答。
       </p>
     </section>
   );
+}
+
+function formatScore(value: number | null | undefined): string {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "--";
+  }
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
 }
 
 function formatAnswerValue(response: string | string[] | null | undefined): string {

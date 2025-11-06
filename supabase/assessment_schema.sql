@@ -27,6 +27,7 @@ create table if not exists public.quiz_questions (
   options jsonb,
   answer jsonb,
   explanation text,
+  points numeric(6,2),
   created_at timestamptz not null default now()
 );
 
@@ -106,6 +107,9 @@ alter table public.quiz_submissions
   add column if not exists reviewed_at timestamptz,
   add column if not exists reviewed_by uuid,
   add column if not exists review_notes text;
+
+alter table public.quiz_questions
+  add column if not exists points numeric(6,2);
 
 alter table public.quiz_submission_answers
   add column if not exists max_points numeric(6,2) default 0,

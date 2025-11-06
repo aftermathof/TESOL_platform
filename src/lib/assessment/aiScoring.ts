@@ -21,6 +21,7 @@ export async function scoreSubjectiveAnswer(params: {
   question: string;
   userAnswer: string;
   referenceAnswer?: string | null;
+  answerOptions?: string[] | null;
 }): Promise<SubjectiveScore> {
   const apiKey = resolveApiKey();
   if (!apiKey || !params.userAnswer.trim()) {
@@ -58,7 +59,7 @@ export async function scoreSubjectiveAnswer(params: {
     const raw = await response.text();
     if (!response.ok) {
       console.warn("[aiScoring] OpenRouter error:", response.status, raw);
-      return { aiScore: null, aiFeedback: `AI 评分失败：${response.status}` };
+      return { aiScore: null, aiFeedback: `AI 评分失败，状态码 ${response.status}` };
     }
 
     const data = JSON.parse(raw) as {
@@ -97,15 +98,22 @@ function buildPrompt(params: {
   question: string;
   userAnswer: string;
   referenceAnswer?: string | null;
+  answerOptions?: string[] | null;
 }): string {
   const reference = params.referenceAnswer
     ? `参考答案：${params.referenceAnswer}`
     : "参考答案：无固定答案，请依据题目要求评估。";
+  const optionsLine =
+    Array.isArray(params.answerOptions) && params.answerOptions.length > 0
+      ? `可参考要点或答题选项：${params.answerOptions.join(" / ")}`
+      : null;
+
   return [
-    `请为以下主观题答案打分，满分100分，仅返回JSON，如 {"score": 85, "feedback": "简短建议"}`,
+    '请为以下主观题答案打分，满分100分，仅返回JSON，如 {"score": 85, "feedback": "简短建议"}',
     `题目：${params.question}`,
     reference,
+    ...(optionsLine ? [optionsLine] : []),
     `考生回答：${params.userAnswer}`,
-    "请确保反馈中文输出，聚焦于可改进的要点。",
+    "请确保反馈使用中文，并提供1-2条可执行的改进建议。",
   ].join("\n");
 }

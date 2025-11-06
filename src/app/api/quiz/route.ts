@@ -57,6 +57,9 @@ export async function POST(request: Request) {
 
   const grading = await gradeAnswers(parseResult.data.answers, questions);
   const userId = await resolveUserId(request);
+  const passed = grading.rawScore >= grading.passThreshold;
+  const status = passed ? "approved" : "rejected";
+  const finalScore = grading.rawScore;
 
   let submissionId: string | null = null;
   if (userId) {
@@ -67,8 +70,9 @@ export async function POST(request: Request) {
         rawScore: grading.rawScore,
         maxScore: grading.maxScore,
         passThreshold: grading.passThreshold,
-        status: "pending_review",
-        passed: null,
+        finalScore,
+        status,
+        passed,
         totalItems: questions.length,
         aiOverallScore: grading.averageAiScore,
         aiSummary: grading.aiSummary,
@@ -82,9 +86,12 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     submissionId,
-    status: "pending_review" as const,
+    status,
     passThreshold: grading.passThreshold,
     maxScore: grading.maxScore,
+    score: grading.rawScore,
+    finalScore,
+    passed,
     aiSummary: grading.aiSummary,
     answers: grading.persistedAnswers.map((answer) => ({
       questionId: answer.questionId,
@@ -92,9 +99,13 @@ export async function POST(request: Request) {
       isObjective: answer.isObjective,
       aiScore: answer.aiScore ?? null,
       aiFeedback: answer.aiFeedback ?? null,
+      awardedPoints: answer.awardedPoints ?? null,
+      maxPoints: answer.maxPoints,
+      isCorrect: answer.isCorrect ?? null,
     })),
-    message:
-      "答卷已提交，成绩将在管理员审核后公布，请耐心等待审核结果。",
+    message: passed
+      ? "AI 已完成评分，恭喜通过测试！"
+      : "AI 已完成评分，本次未达到及格线，请继续努力。",
   });
 }
 
@@ -174,6 +185,7 @@ async function gradeAnswers(
         question: question.prompt,
         userAnswer: userText,
         referenceAnswer: reference,
+        answerOptions: Array.isArray(question.options) ? question.options : undefined,
       });
       record.isObjective = false;
       record.aiScore = aiResult.aiScore;
@@ -218,11 +230,21 @@ function buildScoringPlan(questions: QuizQuestion[]): Map<string, number> {
   const lastIndex = questions.length - 1;
 
   questions.forEach((question, index) => {
+    const configured =
+      typeof question.points === "number" && !Number.isNaN(question.points)
+        ? question.points
+        : null;
+    if (configured != null && configured > 0) {
+      plan.set(question.id, configured);
+      return;
+    }
+
     if (question.type === "short") {
       plan.set(question.id, index === lastIndex ? 50 : 10);
-    } else {
-      plan.set(question.id, 1);
+      return;
     }
+
+    plan.set(question.id, 1);
   });
 
   return plan;

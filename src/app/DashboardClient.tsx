@@ -20,9 +20,9 @@ const quizStatusLabel: Record<
   string
 > = {
   not_started: "尚未测试",
-  pending_review: "待审核",
-  approved: "已审核",
-  rejected: "需复查",
+  pending_review: "待处理",
+  approved: "已通过",
+  rejected: "未通过",
 };
 
 type AsyncState<T> = {
@@ -175,14 +175,14 @@ export function DashboardClient() {
           最高分：
           {quizSnapshot.highestFinalScore != null
             ? `${quizSnapshot.highestFinalScore.toFixed(1)} 分`
-            : "等待审核"}
+            : "暂无通过成绩"}
         </span>
       </div>
     );
 
   const quizDescription =
-    quizSnapshot.pendingReviewCount > 0
-      ? `有 ${quizSnapshot.pendingReviewCount} 份答卷待审核`
+    quizSnapshot.attempts === 0
+      ? "完成学习后即可开启测试。"
       : `最新状态：${quizStatusLabel[quizSnapshot.latestStatus]}`;
 
   return (
@@ -204,7 +204,7 @@ export function DashboardClient() {
             {nextModule ? (
               <Link
                 href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
-                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgb(0,92,230)] focus-visible:outline-none"
+                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white !text-white hover:bg-[rgb(0,92,230)] hover:!text-white focus-visible:outline-none"
               >
                 前往学习模块
               </Link>
