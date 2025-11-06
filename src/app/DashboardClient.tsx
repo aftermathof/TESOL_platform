@@ -15,15 +15,13 @@ const statusMap: Record<string, string> = {
   available: "可下载",
 };
 
-const quizStatusLabel: Record<
-  "not_started" | "pending_review" | "approved" | "rejected",
-  string
-> = {
-  not_started: "尚未测试",
-  pending_review: "待处理",
-  approved: "已通过",
-  rejected: "未通过",
-};
+const quizStatusLabel: Record<"not_started" | "pending_review" | "approved" | "rejected", string> =
+  {
+    not_started: "尚未测试",
+    pending_review: "待处理",
+    approved: "已通过",
+    rejected: "未通过",
+  };
 
 type AsyncState<T> = {
   data: T | null;
@@ -112,9 +110,7 @@ export function DashboardClient() {
     totalModules > 0 ? (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">已完成 {completedModules}</span>
-        <span className="mt-2 text-lg font-semibold text-zinc-500">
-          未完成 {pendingModules}
-        </span>
+        <span className="mt-2 text-lg font-semibold text-zinc-500">未完成 {pendingModules}</span>
       </div>
     ) : (
       <span className="text-3xl font-bold text-zinc-900">暂无学习模块</span>
@@ -168,9 +164,7 @@ export function DashboardClient() {
       <span className="text-lg font-semibold text-zinc-600">尚未完成测试</span>
     ) : (
       <div className="flex flex-col leading-tight">
-        <span className="text-3xl font-bold text-zinc-900">
-          完成 {quizSnapshot.attempts} 次
-        </span>
+        <span className="text-3xl font-bold text-zinc-900">完成 {quizSnapshot.attempts} 次</span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
           最高分：
           {quizSnapshot.highestFinalScore != null
@@ -188,9 +182,7 @@ export function DashboardClient() {
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h2 className="text-2xl font-semibold text-zinc-900">
-          欢迎回来，继续你的 TESOL 学习旅程
-        </h2>
+        <h2 className="text-2xl font-semibold text-zinc-900">欢迎回来，继续你的 TESOL 学习旅程</h2>
         {(nextModule || nextModuleDisplay === "已全部完成") && (
           <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-6 text-sm text-sky-700 md:flex-row md:items-center md:justify-between">
             <div>
@@ -204,7 +196,7 @@ export function DashboardClient() {
             {nextModule ? (
               <Link
                 href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
-                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white !text-white hover:bg-[rgb(0,92,230)] hover:!text-white focus-visible:outline-none"
+                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgb(0,92,230)] focus-visible:outline-none"
               >
                 前往学习模块
               </Link>
@@ -217,10 +209,9 @@ export function DashboardClient() {
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-3">
         <ProgressCard title="学习进度" value={completionValue} />
         <ProgressCard title="测验情况" value={quizValue} description={quizDescription} />
-
         <ProgressCard
           title="证书状态"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
@@ -241,7 +232,7 @@ function ProgressCard({
   description?: string;
 }) {
   return (
-    <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+    <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <p className="text-sm font-semibold text-zinc-500">{title}</p>
       <div className="mt-3 text-3xl font-bold text-zinc-900">{value}</div>
       {description ? <p className="mt-2 text-sm text-zinc-600">{description}</p> : null}
