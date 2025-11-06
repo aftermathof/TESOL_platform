@@ -25,6 +25,7 @@ export type QuizQuestionRecord = {
   options: string[] | null;
   answer: unknown;
   explanation: string | null;
+  ai_prompt?: string | null;
   points?: number | null;
   created_at: string;
 };
@@ -36,6 +37,7 @@ export type QuizQuestion = {
   options?: string[];
   answer?: unknown;
   explanation?: string | null;
+  aiPrompt?: string | null;
   points?: number | null;
 };
 

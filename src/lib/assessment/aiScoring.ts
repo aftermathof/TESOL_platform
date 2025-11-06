@@ -22,6 +22,7 @@ export async function scoreSubjectiveAnswer(params: {
   userAnswer: string;
   referenceAnswer?: string | null;
   answerOptions?: string[] | null;
+  promptOverride?: string | null;
 }): Promise<SubjectiveScore> {
   const apiKey = resolveApiKey();
   if (!apiKey || !params.userAnswer.trim()) {
@@ -99,7 +100,19 @@ function buildPrompt(params: {
   userAnswer: string;
   referenceAnswer?: string | null;
   answerOptions?: string[] | null;
+  promptOverride?: string | null;
 }): string {
+  if (params.promptOverride) {
+    return compilePrompt(params.promptOverride, {
+      question: params.question,
+      answer: params.userAnswer,
+      reference:
+        params.referenceAnswer ??
+        "无固定答案，请结合题目要求、公平、公正地给出评价。",
+      options: params.answerOptions?.join(" / ") ?? "",
+    });
+  }
+
   const reference = params.referenceAnswer
     ? `参考答案：${params.referenceAnswer}`
     : "参考答案：无固定答案，请依据题目要求评估。";
@@ -116,4 +129,15 @@ function buildPrompt(params: {
     `考生回答：${params.userAnswer}`,
     "请确保反馈使用中文，并提供1-2条可执行的改进建议。",
   ].join("\n");
+}
+
+function compilePrompt(
+  template: string,
+  tokens: { question: string; answer: string; reference: string; options: string }
+): string {
+  return template
+    .replaceAll("{question}", tokens.question)
+    .replaceAll("{answer}", tokens.answer)
+    .replaceAll("{reference}", tokens.reference)
+    .replaceAll("{options}", tokens.options);
 }

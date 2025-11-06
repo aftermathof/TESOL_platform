@@ -142,16 +142,23 @@ async function gradeAnswers(
     };
 
     if (question.type === "single") {
-      const expected =
-        typeof question.answer === "string" ? question.answer : null;
+      const expected = resolveSingleAnswer(question.answer, question.options);
+      const received =
+        typeof userAnswer === "string" ? userAnswer.trim() : undefined;
       const correct =
-        typeof userAnswer === "string" && userAnswer === expected;
+        expected != null &&
+        typeof received === "string" &&
+        normalizeOptionValue(received) === normalizeOptionValue(expected);
       record.isCorrect = correct;
       record.awardedPoints = correct ? weight : 0;
       rawScore += record.awardedPoints;
     } else if (question.type === "multiple") {
-      const expected = Array.isArray(question.answer) ? question.answer : [];
-      const received = Array.isArray(userAnswer) ? userAnswer : [];
+      const expected = resolveMultipleAnswer(question.answer, question.options);
+      const received = Array.isArray(userAnswer)
+        ? userAnswer.map((item) =>
+            typeof item === "string" ? normalizeOptionValue(item) : ""
+          )
+        : [];
       const correct =
         expected.length === received.length &&
         expected.every((item) => received.includes(item));
@@ -186,6 +193,7 @@ async function gradeAnswers(
         userAnswer: userText,
         referenceAnswer: reference,
         answerOptions: Array.isArray(question.options) ? question.options : undefined,
+        promptOverride: question.aiPrompt ?? undefined,
       });
       record.isObjective = false;
       record.aiScore = aiResult.aiScore;
@@ -248,6 +256,58 @@ function buildScoringPlan(questions: QuizQuestion[]): Map<string, number> {
   });
 
   return plan;
+}
+
+function normalizeOptionValue(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function mapLetterToOption(
+  rawValue: string,
+  options?: string[] | null
+): string | undefined {
+  const trimmed = rawValue.trim();
+  if (!options || options.length === 0) {
+    return undefined;
+  }
+  if (/^[A-Za-z]$/.test(trimmed)) {
+    const index = trimmed.toUpperCase().charCodeAt(0) - 65;
+    if (index >= 0 && index < options.length) {
+      return options[index];
+    }
+  }
+  return undefined;
+}
+
+function resolveSingleAnswer(
+  answer: unknown,
+  options?: string[] | null
+): string | null {
+  if (typeof answer === "string") {
+    const mapped = mapLetterToOption(answer, options);
+    return (mapped ?? answer).trim();
+  }
+  return null;
+}
+
+function resolveMultipleAnswer(
+  answer: unknown,
+  options?: string[] | null
+): string[] {
+  if (Array.isArray(answer)) {
+    return answer
+      .map((item) => {
+        if (typeof item !== "string") return null;
+        const mapped = mapLetterToOption(item, options) ?? item;
+        return normalizeOptionValue(mapped);
+      })
+      .filter((item): item is string => Boolean(item));
+  }
+  if (typeof answer === "string") {
+    const mapped = mapLetterToOption(answer, options) ?? answer;
+    return [normalizeOptionValue(mapped)];
+  }
+  return [];
 }
 
 async function resolveUserId(request: Request): Promise<string | null> {

@@ -220,11 +220,7 @@ export function DashboardClient() {
       <section className="grid gap-4 md:grid-cols-4">
         <ProgressCard title="学习进度" value={completionValue} />
         <ProgressCard title="测验情况" value={quizValue} description={quizDescription} />
-        <ProgressCard
-          title="Teaching Plan"
-          value={statusMap[progressState.data?.teachingPlanStatus ?? "not_submitted"]}
-          description="AI 教案生成状态"
-        />
+
         <ProgressCard
           title="证书状态"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}

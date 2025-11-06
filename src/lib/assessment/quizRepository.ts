@@ -27,6 +27,7 @@ function mapQuestion(record: QuizQuestionRecord): QuizQuestion {
       record.points != null && !Number.isNaN(Number(record.points))
         ? Number(record.points)
         : undefined,
+    aiPrompt: record.ai_prompt ?? undefined,
   };
 }
 
