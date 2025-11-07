@@ -109,6 +109,18 @@ function AuthContainer({
         if (signUpError) {
           throw signUpError;
         }
+        const userId = data.user?.id;
+        if (userId) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .upsert({
+              id: userId,
+              full_name: fullName.trim(),
+            });
+          if (profileError) {
+            console.warn("[login] Failed to upsert profile name:", profileError);
+          }
+        }
         if (data.session == null) {
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email,

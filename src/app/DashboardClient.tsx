@@ -177,7 +177,7 @@ export function DashboardClient() {
   const quizDescription =
     quizSnapshot.attempts === 0
       ? "完成学习后即可开启测试。"
-      : `最：${quizStatusLabel[quizSnapshot.latestStatus]}`;
+      : `最新一次测试：${quizStatusLabel[quizSnapshot.latestStatus]}`;
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
