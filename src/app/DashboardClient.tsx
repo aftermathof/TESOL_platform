@@ -177,7 +177,7 @@ export function DashboardClient() {
   const quizDescription =
     quizSnapshot.attempts === 0
       ? "完成学习后即可开启测试。"
-      : `最近一次测试：${quizStatusLabel[quizSnapshot.latestStatus]}`;
+      : `最：${quizStatusLabel[quizSnapshot.latestStatus]}`;
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
@@ -195,9 +195,9 @@ export function DashboardClient() {
             {nextModule ? (
               <Link
                 href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
-                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgb(0,92,230)] focus-visible:outline-none"
+                className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgba(242, 244, 247, 1)] hover:text-white focus-visible:outline-none"
               >
-                前往学习模块
+                <span className="text-white">前往学习模块</span>
               </Link>
             ) : (
               <div className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 font-medium text-white">
