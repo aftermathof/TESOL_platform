@@ -372,7 +372,9 @@ function QuestionItem({
       <p className="text-sm font-semibold text-zinc-500">
         第 {index + 1} 题 · {typeLabel[question.type]}
       </p>
-      <p className="mt-2 text-base text-zinc-800">{question.prompt}</p>
+      <p className="mt-2 text-base text-zinc-800 whitespace-pre-line">
+        {question.prompt}
+      </p>
       {hint ? <p className="mt-2 text-xs text-zinc-500">{hint}</p> : null}
 
       {question.type === "single" && question.options && (
@@ -610,7 +612,9 @@ function SubmissionReviewPanel({
               key={answer.questionId}
               className="rounded-xl border border-sky-100 bg-white/70 p-4 text-sky-800"
             >
-              <p className="font-semibold text-sky-900">{question.prompt}</p>
+              <p className="font-semibold text-sky-900 whitespace-pre-line">
+                {question.prompt}
+              </p>
               <p className="mt-2 text-xs text-sky-700">
                 我的回答：{renderedResponse || "（未作答）"}
               </p>
