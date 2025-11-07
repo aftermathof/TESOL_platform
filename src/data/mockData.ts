@@ -1,4 +1,4 @@
-export type LearningSection = {
+﻿export type LearningSection = {
   id: string;
   title: string;
   duration: string;
@@ -20,6 +20,8 @@ export type QuizQuestion = {
   options?: string[];
   answer?: string | string[];
   explanation?: string;
+  points?: number;
+  aiPrompt?: string;
 };
 
 export type Quiz = {
@@ -60,7 +62,7 @@ export type ProgressSnapshot = {
 export const mockLearningModules: LearningModule[] = [
   {
     id: "module-1",
-    title: "Module 1 · TESOL Foundation",
+    title: "Module 1 路 TESOL Foundation",
     description:
       "Introduction to TESOL methodology, core concepts, and learner-centered classrooms.",
     progress: 0.6,
@@ -93,7 +95,7 @@ export const mockLearningModules: LearningModule[] = [
   },
   {
     id: "module-2",
-    title: "Module 2 · Lesson Planning",
+    title: "Module 2 路 Lesson Planning",
     description:
       "Designing effective TESOL lesson plans with clear objectives and assessment strategies.",
     progress: 0.35,
@@ -115,7 +117,7 @@ export const mockLearningModules: LearningModule[] = [
         title: "Assessment and Feedback",
         duration: "19 min",
         content: [
-          "Assessment is not an end-of-unit surprise; it is woven into every interaction. Use quick pulse checks—emoji polls, thumbs up/down, exit tickets—to gauge comprehension and adjust pacing.",
+          "Assessment is not an end-of-unit surprise; it is woven into every interaction. Use quick pulse checks鈥攅moji polls, thumbs up/down, exit tickets鈥攖o gauge comprehension and adjust pacing.",
           "",
           "When offering feedback, connect comments explicitly to learning goals. Highlight what learners did well, then provide one actionable step for improvement. Encourage peer feedback through structured prompts that focus on noticing rather than judging.",
           "",
@@ -126,7 +128,7 @@ export const mockLearningModules: LearningModule[] = [
   },
 ];
 
-export const mockQuiz: Quiz = {
+﻿export const mockQuiz: Quiz = {
   id: "quiz-1",
   title: "51Talk TESOL Certification · 综合测验",
   duration: 90,
@@ -169,7 +171,7 @@ export const mockQuiz: Quiz = {
       id: "q3",
       type: "single",
       prompt:
-        "在一节听力课中，教师播放音频前安排预测活动，其主要目的是：",
+        "在一节听力课中，教师播放音频前安排预测活动，其主要目的是？",
       options: [
         "提升学生的发音准确度",
         "降低学生的焦虑感并激活背景知识",
@@ -257,7 +259,8 @@ export const mockQuiz: Quiz = {
       prompt:
         "请结合自身教学经验，写出一项可帮助学习者自主规划学习目标的策略，并说明实施步骤。",
       explanation:
-        "建议包括：提供学习计划模版、引导学生设定 SMART 目标、定期反思等。",
+        "建议包括：提供学习计划模板、引导学生设定 SMART 目标、定期反思等。",
+      points: 10,
     },
     {
       id: "q10",
@@ -266,6 +269,7 @@ export const mockQuiz: Quiz = {
         "在大班在线课堂中，如果出现部分学生持续沉默的情况，你会如何通过课堂设计鼓励他们主动发言？请描述你的方案。",
       explanation:
         "可以提及分组讨论、分配角色、使用匿名提问板等策略，并说明反馈机制。",
+      points: 50,
     },
   ],
 };

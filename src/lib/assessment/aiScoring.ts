@@ -1,4 +1,4 @@
-const OPENROUTE_ENDPOINT =
+﻿const OPENROUTE_ENDPOINT =
   process.env.OPENROUTE_API_URL ?? "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTE_MODEL =
   process.env.OPENROUTE_MODEL ?? "google/gemini-2.5-flash";
@@ -25,8 +25,15 @@ export async function scoreSubjectiveAnswer(params: {
   promptOverride?: string | null;
 }): Promise<SubjectiveScore> {
   const apiKey = resolveApiKey();
-  if (!apiKey || !params.userAnswer.trim()) {
+  const trimmedAnswer = params.userAnswer.trim();
+  if (!apiKey || !trimmedAnswer) {
     return { aiScore: null, aiFeedback: null };
+  }
+  if (trimmedAnswer.length < 10) {
+    return {
+      aiScore: 0,
+      aiFeedback: "回答内容不足，无法进行AI评分。",
+    };
   }
 
   const prompt = buildPrompt(params);
@@ -103,7 +110,8 @@ function buildPrompt(params: {
   promptOverride?: string | null;
 }): string {
   if (params.promptOverride) {
-    return compilePrompt(params.promptOverride, {
+    const template = params.promptOverride;
+    const compiled = compilePrompt(template, {
       question: params.question,
       answer: params.userAnswer,
       reference:
@@ -111,6 +119,41 @@ function buildPrompt(params: {
         "无固定答案，请结合题目要求、公平、公正地给出评价。",
       options: params.answerOptions?.join(" / ") ?? "",
     });
+
+    const hasQuestionToken = template.includes("{question}") || template.includes("{{question}}");
+    const hasAnswerToken = template.includes("{answer}") || template.includes("{{answer}}");
+    const hasReferenceToken =
+      template.includes("{reference}") || template.includes("{{reference}}");
+    const hasOptionsToken = template.includes("{options}") || template.includes("{{options}}");
+
+    const needsQuestion = !hasQuestionToken;
+    const needsAnswer = !hasAnswerToken;
+    const needsReference = !hasReferenceToken && params.referenceAnswer;
+    const needsOptions =
+      !hasOptionsToken &&
+      Array.isArray(params.answerOptions) &&
+      params.answerOptions.length > 0;
+
+    const extras: string[] = [];
+    if (needsQuestion) {
+      extras.push(`题目：${params.question}`);
+    }
+    if (needsReference) {
+      extras.push(
+        `参考答案：${
+          params.referenceAnswer ??
+          "无固定答案，请结合题目要求、公平、公正地给出评价。"
+        }`
+      );
+    }
+    if (needsOptions && params.answerOptions) {
+      extras.push(`可参考要点：${params.answerOptions.join(" / ")}`);
+    }
+    if (needsAnswer) {
+      extras.push(`考生回答：${params.userAnswer}`);
+    }
+
+    return extras.length > 0 ? `${compiled}\n\n${extras.join("\n")}` : compiled;
   }
 
   const reference = params.referenceAnswer
@@ -127,7 +170,7 @@ function buildPrompt(params: {
     reference,
     ...(optionsLine ? [optionsLine] : []),
     `考生回答：${params.userAnswer}`,
-    "请确保反馈使用中文，并提供1-2条可执行的改进建议。",
+    "请确保反馈使用中文，并提供 1-2 条可执行的改进建议。",
   ].join("\n");
 }
 
@@ -135,9 +178,10 @@ function compilePrompt(
   template: string,
   tokens: { question: string; answer: string; reference: string; options: string }
 ): string {
-  return template
-    .replaceAll("{question}", tokens.question)
-    .replaceAll("{answer}", tokens.answer)
-    .replaceAll("{reference}", tokens.reference)
-    .replaceAll("{options}", tokens.options);
+  return ["question", "answer", "reference", "options"].reduce((acc, key) => {
+    const value = tokens[key as keyof typeof tokens] ?? "";
+    return acc
+      .replaceAll(`{${key}}`, value)
+      .replaceAll(`{{${key}}}`, value);
+  }, template);
 }

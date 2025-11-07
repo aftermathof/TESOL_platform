@@ -6,8 +6,10 @@ import {
 } from "@/lib/assessment/quizRepository";
 import { scoreSubjectiveAnswer } from "@/lib/assessment/aiScoring";
 import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
-import type { QuizQuestion } from "@/data/mockData";
-import type { QuizSubmissionAnswer } from "@/lib/assessment/types";
+import type {
+  QuizQuestion,
+  QuizSubmissionAnswer,
+} from "@/lib/assessment/types";
 
 const submissionSchema = z.object({
   quizId: z.string().uuid().optional(),
@@ -199,8 +201,7 @@ async function gradeAnswers(
       record.aiScore = aiResult.aiScore;
       record.aiFeedback = aiResult.aiFeedback ?? null;
       if (typeof aiResult.aiScore === "number") {
-        const awarded = (aiResult.aiScore / 100) * weight;
-        record.awardedPoints = Number(awarded.toFixed(2));
+        record.awardedPoints = Number(aiResult.aiScore.toFixed(2));
         rawScore += record.awardedPoints;
         aiScores.push(aiResult.aiScore);
       }
@@ -235,9 +236,15 @@ async function gradeAnswers(
 
 function buildScoringPlan(questions: QuizQuestion[]): Map<string, number> {
   const plan = new Map<string, number>();
-  const lastIndex = questions.length - 1;
+  const shortQuestionIds = questions
+    .filter((question) => question.type === "short")
+    .map((question) => question.id);
+  const lastShortId =
+    shortQuestionIds.length > 0
+      ? shortQuestionIds[shortQuestionIds.length - 1]
+      : null;
 
-  questions.forEach((question, index) => {
+  questions.forEach((question) => {
     const configured =
       typeof question.points === "number" && !Number.isNaN(question.points)
         ? question.points
@@ -248,7 +255,7 @@ function buildScoringPlan(questions: QuizQuestion[]): Map<string, number> {
     }
 
     if (question.type === "short") {
-      plan.set(question.id, index === lastIndex ? 50 : 10);
+      plan.set(question.id, question.id === lastShortId ? 50 : 10);
       return;
     }
 

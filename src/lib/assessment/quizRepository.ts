@@ -51,6 +51,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
         answer: question.answer,
         explanation: question.explanation,
         points: typeof question.points === "number" ? question.points : undefined,
+        aiPrompt: typeof question.aiPrompt === "string" ? question.aiPrompt : undefined,
       })),
     };
   }
@@ -80,6 +81,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
         answer: question.answer,
         explanation: question.explanation,
         points: typeof question.points === "number" ? question.points : undefined,
+        aiPrompt: typeof question.aiPrompt === "string" ? question.aiPrompt : undefined,
       })),
     };
   }
