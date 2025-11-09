@@ -9,8 +9,6 @@ type CertificateInfo = {
   fullName: string | null;
   issuedAt: string | null;
   pdfUrl: string | null;
-  docxUrl: string | null;
-  aiMessage: string | null;
 };
 
 type CertificateResponse = {
@@ -156,22 +154,29 @@ export function CertificateClient() {
         <InfoBlock label="测验最高分" value={highestScore} />
       </div>
 
-      {certificate.aiMessage && (
-        <div className="rounded-xl bg-sky-50/70 p-4 text-sm text-sky-800">
-          <p className="font-semibold text-sky-900">AI 寄语</p>
-          <p className="mt-1">{certificate.aiMessage}</p>
-        </div>
-      )}
-
       {showPreview ? (
         <div className="space-y-3">
           <p className="text-sm font-semibold text-zinc-700">证书预览</p>
           <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-zinc-200">
-            <iframe
-              title="Certificate Preview"
-              src={certificate.pdfUrl ?? ""}
+            <object
+              key={certificate.pdfUrl ?? undefined}
+              type="application/pdf"
+              data={certificate.pdfUrl ?? undefined}
               className="h-full w-full"
-            />
+            >
+              <p className="p-4 text-sm text-zinc-600">
+                浏览器不支持内嵌预览，请{" "}
+                <a
+                  href={certificate.pdfUrl ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-600 underline"
+                >
+                  点击这里下载
+                </a>
+                。
+              </p>
+            </object>
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
@@ -182,16 +187,6 @@ export function CertificateClient() {
             >
               下载 PDF
             </a>
-            {certificate.docxUrl && (
-              <a
-                href={certificate.docxUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-zinc-300 px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
-              >
-                下载 Word 模板
-              </a>
-            )}
           </div>
         </div>
       ) : (

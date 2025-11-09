@@ -34,8 +34,6 @@ export type CertificateInfo = {
   fullName: string | null;
   issuedAt: string | null;
   pdfUrl: string | null;
-  docxUrl: string | null;
-  aiMessage: string | null;
 };
 
 export type CertificateEligibility = {
@@ -74,11 +72,6 @@ export async function getCertificateSnapshot(userId: string): Promise<{
   ]);
 
   const record = certificateRow ?? null;
-  const metadata = (record?.metadata ?? null) as Record<string, unknown> | null;
-  const aiMessage =
-    metadata && typeof metadata["ai_message"] === "string"
-      ? (metadata["ai_message"] as string)
-      : null;
 
   const status: CertificateInfo["status"] = record?.pdf_url
     ? "ready"
@@ -93,8 +86,6 @@ export async function getCertificateSnapshot(userId: string): Promise<{
       fullName: record?.full_name ?? fullName,
       issuedAt: record?.issued_at ?? null,
       pdfUrl: record?.pdf_url ?? null,
-      docxUrl: record?.docx_url ?? null,
-      aiMessage,
     },
     eligibility,
   };
@@ -115,18 +106,12 @@ export async function claimCertificate(userId: string): Promise<CertificateInfo>
   const certificateRow = await ensureCertificateRow(userId, fullName);
 
   if (certificateRow.pdf_url && certificateRow.issued_at) {
-    const metadata = (certificateRow.metadata ?? null) as Record<string, unknown> | null;
     return {
       status: "ready",
       certificateNumber: certificateRow.certificate_number,
       fullName: certificateRow.full_name ?? fullName,
       issuedAt: certificateRow.issued_at,
       pdfUrl: certificateRow.pdf_url,
-      docxUrl: certificateRow.docx_url,
-      aiMessage:
-        metadata && typeof metadata["ai_message"] === "string"
-          ? (metadata["ai_message"] as string)
-          : null,
     };
   }
 
@@ -141,20 +126,11 @@ export async function claimCertificate(userId: string): Promise<CertificateInfo>
     certificateNumber,
   });
   const pdfBuffer = await convertDocxToPdf(docxBuffer);
-  const aiMessage = await generateAiMessage(populatedFullName, certificateNumber);
 
   const storageKeyBase = `${userId}/${certificateNumber ?? issueDate.format("YYYYMMDDHHmmss")}`;
-  const docxKey = `${storageKeyBase}.docx`;
   const pdfKey = `${storageKeyBase}.pdf`;
 
   const storage = supabase.storage.from(STORAGE_BUCKET);
-  const uploadDocx = await storage.upload(docxKey, docxBuffer, {
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    upsert: true,
-  });
-  if (uploadDocx.error) {
-    throw uploadDocx.error;
-  }
   const uploadPdf = await storage.upload(pdfKey, pdfBuffer, {
     contentType: "application/pdf",
     upsert: true,
@@ -163,22 +139,15 @@ export async function claimCertificate(userId: string): Promise<CertificateInfo>
     throw uploadPdf.error;
   }
 
-  const docxUrl = storage.getPublicUrl(docxKey).data.publicUrl;
   const pdfUrl = storage.getPublicUrl(pdfKey).data.publicUrl;
-
-  const updatedMetadata = {
-    ...(certificateRow.metadata ?? {}),
-    ai_message: aiMessage,
-  };
 
   const { data: updated, error } = await supabase
     .from("certificates")
     .update({
       full_name: fullName,
       issued_at: issueDate.toISOString(),
-      docx_url: docxUrl,
       pdf_url: pdfUrl,
-      metadata: updatedMetadata,
+      docx_url: null,
     })
     .eq("user_id", userId)
     .select()
@@ -194,8 +163,6 @@ export async function claimCertificate(userId: string): Promise<CertificateInfo>
     fullName: updated.full_name ?? fullName,
     issuedAt: updated.issued_at,
     pdfUrl: updated.pdf_url,
-    docxUrl: updated.docx_url,
-    aiMessage: aiMessage ?? null,
   };
 }
 
@@ -431,82 +398,4 @@ function replaceCertificateNumber(document: Document, certificateNumber: string)
     textNodes[4].textContent = secondGroup;
     break;
   }
-}
-
-async function generateAiMessage(
-  fullName: string,
-  certificateNumber: string | null
-): Promise<string | null> {
-  const apiKey = process.env.OPENROUTE_API_KEY?.trim();
-  if (!apiKey) {
-    return null;
-  }
-
-  const endpoint =
-    process.env.OPENROUTE_API_URL ?? "https://openrouter.ai/api/v1/chat/completions";
-  const model = process.env.OPENROUTE_MODEL ?? "google/gemini-2.5-flash";
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You create short, uplifting English congratulatory messages (<= 160 characters) for TESOL certificates. Return JSON {\"message\": \"...\"}.",
-          },
-          {
-            role: "user",
-            content: `Write a concise English congratulations line for ${fullName}'s TESOL certificate (certificate number ${
-              certificateNumber ?? "unknown"
-            }).`,
-          },
-        ],
-      }),
-    });
-
-    const raw = await response.text();
-    if (!response.ok) {
-      console.warn("[certificate] AI message failed", response.status, raw);
-      return null;
-    }
-    const parsed = JSON.parse(raw) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = parsed.choices?.[0]?.message?.content;
-    if (!content) return null;
-    try {
-      const json = JSON.parse(content) as { message?: string };
-      if (typeof json.message === "string") {
-        const sanitized = sanitizeAscii(json.message);
-        return sanitized || defaultAiMessage(certificateNumber);
-      }
-      return defaultAiMessage(certificateNumber);
-    } catch {
-      const sanitized = sanitizeAscii(content);
-      return sanitized || defaultAiMessage(certificateNumber);
-    }
-  } catch (error) {
-    console.warn("[certificate] AI message error", error);
-    return defaultAiMessage(certificateNumber);
-  }
-}
-
-function defaultAiMessage(certificateNumber: string | null): string {
-  return certificateNumber
-    ? `Congratulations on earning TESOL certificate ${certificateNumber}!`
-    : "Congratulations on successfully completing the TESOL certification!";
-}
-
-function sanitizeAscii(text: string | null | undefined): string {
-  if (!text) return "";
-  return text.replace(/[^\x20-\x7E]/g, "").trim();
 }

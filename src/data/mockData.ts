@@ -43,8 +43,6 @@ export type CertificateInfo = {
   certificateNumber: string | null;
   issuedAt: string | null;
   pdfUrl: string | null;
-  docxUrl?: string | null;
-  aiMessage?: string | null;
 };
 
 export type QuizProgress = {
@@ -301,8 +299,6 @@ export const mockCertificate: CertificateInfo = {
   certificateNumber: null,
   issuedAt: null,
   pdfUrl: null,
-  docxUrl: null,
-  aiMessage: null,
 };
 
 export const mockProgress: ProgressSnapshot = {
