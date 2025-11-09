@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 import { useAuth } from "@/components/AuthProvider";
@@ -44,8 +45,8 @@ function LoginPageContent() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-white text-slate-900">
-      <div className="absolute left-6 top-8 text-2xl font-semibold tracking-[0.3em] text-slate-900">
-        51Talk
+      <div className="absolute left-6 top-6">
+        <Image src="/logo.png" alt="51Talk logo" width={110} height={32} priority />
       </div>
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-slate-300 via-blue-500 to-slate-300 opacity-70" />
       <AuthContainer redirect={redirect} supabase={supabase} />
