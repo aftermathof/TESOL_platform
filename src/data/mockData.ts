@@ -38,11 +38,13 @@ export type TeachingPlanTemplate = {
 };
 
 export type CertificateInfo = {
-  certificateId: string;
-  teacherName: string;
-  issuedAt: string;
-  status: "ready" | "pending" | "locked";
-  downloadUrl?: string;
+  status: "not_eligible" | "eligible" | "ready";
+  fullName: string | null;
+  certificateNumber: string | null;
+  issuedAt: string | null;
+  pdfUrl: string | null;
+  docxUrl?: string | null;
+  aiMessage?: string | null;
 };
 
 export type QuizProgress = {
@@ -57,6 +59,7 @@ export type ProgressSnapshot = {
   quiz: QuizProgress;
   teachingPlanStatus: "not_submitted" | "in_review" | "approved";
   certificateStatus: "not_eligible" | "generating" | "available";
+  certificateUrl?: string | null;
 };
 
 export const mockLearningModules: LearningModule[] = [
@@ -293,10 +296,13 @@ export const mockTeachingPlanTemplate: TeachingPlanTemplate = {
 };
 
 export const mockCertificate: CertificateInfo = {
-  certificateId: "TESOL-2025-0001",
-  teacherName: "Alex Johnson",
-  issuedAt: "2025-10-15",
-  status: "pending",
+  status: "not_eligible",
+  fullName: null,
+  certificateNumber: null,
+  issuedAt: null,
+  pdfUrl: null,
+  docxUrl: null,
+  aiMessage: null,
 };
 
 export const mockProgress: ProgressSnapshot = {
@@ -309,4 +315,5 @@ export const mockProgress: ProgressSnapshot = {
   },
   teachingPlanStatus: "in_review",
   certificateStatus: "not_eligible",
+  certificateUrl: null,
 };

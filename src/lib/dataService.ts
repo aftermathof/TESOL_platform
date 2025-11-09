@@ -1,10 +1,8 @@
 import {
-  mockCertificate,
   mockLearningModules,
   mockProgress,
   mockQuiz,
   mockTeachingPlanTemplate,
-  type CertificateInfo,
   type LearningModule,
   type ProgressSnapshot,
   type Quiz,
@@ -12,6 +10,7 @@ import {
 } from "@/data/mockData";
 import { getActiveQuiz } from "@/lib/assessment/quizRepository";
 import { getSupabaseServiceClient } from "@/lib/supabaseServerClient";
+import { getCertificateSnapshot } from "@/lib/certificates/server";
 
 export async function getLearningModules(): Promise<LearningModule[]> {
   return structuredClone(mockLearningModules);
@@ -46,10 +45,6 @@ export async function getTeachingPlanTemplate(): Promise<TeachingPlanTemplate> {
   return structuredClone(mockTeachingPlanTemplate);
 }
 
-export async function getCertificateInfo(): Promise<CertificateInfo> {
-  return structuredClone(mockCertificate);
-}
-
 export async function getProgressSnapshot(
   userId?: string | null
 ): Promise<ProgressSnapshot> {
@@ -60,11 +55,14 @@ export async function getProgressSnapshot(
   }
 
   try {
-    const { data: submissionRows, error } = await supabase
-      .from("quiz_submissions")
-      .select("status, final_score, score")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+    const [{ data: submissionRows, error }, certificateState] = await Promise.all([
+      supabase
+        .from("quiz_submissions")
+        .select("status, final_score, score")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      getCertificateSnapshot(userId),
+    ]);
 
     if (error) {
       throw error;
@@ -90,8 +88,20 @@ export async function getProgressSnapshot(
       attempts > 0 ? submissions[0]?.status ?? "pending_review" : "not_started";
     const latestStatus = normalizeSubmissionStatus(latestStatusRaw, attempts);
 
+    const certificateStatus =
+      certificateState.certificate.status === "ready"
+        ? "available"
+        : certificateState.certificate.status === "eligible"
+        ? "generating"
+        : "not_eligible";
+    const learningCompletion =
+      certificateState.eligibility.totalModules > 0
+        ? certificateState.eligibility.completedModules /
+          certificateState.eligibility.totalModules
+        : mockProgress.learningCompletion;
+
     return {
-      learningCompletion: mockProgress.learningCompletion,
+      learningCompletion,
       quiz: {
         attempts,
         highestFinalScore,
@@ -99,7 +109,8 @@ export async function getProgressSnapshot(
         latestStatus,
       },
       teachingPlanStatus: mockProgress.teachingPlanStatus,
-      certificateStatus: mockProgress.certificateStatus,
+      certificateStatus,
+      certificateUrl: certificateState.certificate.pdfUrl ?? null,
     };
   } catch (error) {
     console.warn("[dataService] Using mock progress due to error:", error);

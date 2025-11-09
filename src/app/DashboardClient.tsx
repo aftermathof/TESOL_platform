@@ -7,12 +7,9 @@ import type { ProgressSnapshot } from "@/data/mockData";
 import { useAuth } from "@/components/AuthProvider";
 
 const statusMap: Record<string, string> = {
-  not_submitted: "未提交",
-  in_review: "审核中",
-  approved: "已通过",
   not_eligible: "暂未满足条件",
-  generating: "生成中",
-  available: "可下载",
+  generating: "可领取证书",
+  available: "证书已生成",
 };
 
 const quizStatusLabel: Record<"not_started" | "pending_review" | "approved" | "rejected", string> =
@@ -214,7 +211,6 @@ export function DashboardClient() {
         <ProgressCard
           title="证书状态"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
-          description="达到条件后可自动生成证书"
         />
       </section>
     </div>
