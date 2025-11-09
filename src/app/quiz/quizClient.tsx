@@ -206,7 +206,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
               </p>
             ) : null}
             <p className="mt-4 text-base text-zinc-700">
-              本次测验共 {totalQuestions} 道题，涵盖单选、多选、填空和简答题型。
+              本次测验共 {totalQuestions} 道题，涵盖题型：单选、简答。
               测试时长 90 分钟，将在倒计时结束后自动提交。
             </p>
           </div>

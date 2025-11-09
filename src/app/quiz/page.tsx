@@ -14,7 +14,7 @@ export default async function QuizPage() {
           测验中心
         </h2>
         <p className="text-sm text-zinc-500">
-          完成全部学习内容后即可开启测试，系统将自动评估并允许管理员复核结果。
+          完成全部学习内容后即可开启测试。
         </p>
       </header>
       <QuizClient quiz={quiz} />

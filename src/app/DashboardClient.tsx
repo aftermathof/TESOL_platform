@@ -211,6 +211,19 @@ export function DashboardClient() {
         <ProgressCard
           title="证书状态"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
+          description={
+            progressState.data?.certificateStatus === "available" &&
+            progressState.data?.certificateUrl ? (
+              <a
+                href={progressState.data.certificateUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center rounded-full border border-sky-500 px-3 py-1 text-sm font-semibold text-sky-600 hover:bg-sky-50"
+              >
+                下载 PDF
+              </a>
+            ) : undefined
+          }
         />
       </section>
     </div>
@@ -224,13 +237,17 @@ function ProgressCard({
 }: {
   title: string;
   value: ReactNode;
-  description?: string;
+  description?: string | ReactNode;
 }) {
   return (
     <article className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <p className="text-sm font-semibold text-zinc-500">{title}</p>
       <div className="mt-3 text-3xl font-bold text-zinc-900">{value}</div>
-      {description ? <p className="mt-2 text-sm text-zinc-600">{description}</p> : null}
+      {typeof description === "string" ? (
+        <p className="mt-2 text-sm text-zinc-600">{description}</p>
+      ) : description ? (
+        <div className="mt-2 text-sm">{description}</div>
+      ) : null}
     </article>
   );
 }

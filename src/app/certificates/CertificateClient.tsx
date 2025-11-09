@@ -178,7 +178,7 @@ export function CertificateClient() {
               </p>
             </object>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm">
+          <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
             <a
               href={certificate.pdfUrl ?? "#"}
               target="_blank"
