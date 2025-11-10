@@ -102,14 +102,6 @@ export function DashboardClient() {
     };
   }, [session?.access_token]);
 
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
   const modules = useMemo(() => modulesState.data ?? [], [modulesState.data]);
   const totalModules = modules.length;
   const completedModules = modules.filter((module) => module.completed).length;
