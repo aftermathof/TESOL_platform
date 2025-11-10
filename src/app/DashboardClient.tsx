@@ -108,14 +108,14 @@ export function DashboardClient() {
   const pendingModules = Math.max(totalModules - completedModules, 0);
   const completionLabel =
     totalModules > 0
-      ? `Completed ${completedModules} · Remaining ${pendingModules}`
+      ? `Completed: ${completedModules} · Remaining: ${pendingModules}`
       : "No learning modules yet";
 
   const completionValue: ReactNode =
     totalModules > 0 ? (
       <div className="flex flex-col leading-tight">
-        <span className="text-3xl font-bold text-zinc-900">Completed {completedModules}</span>
-        <span className="mt-2 text-lg font-semibold text-zinc-500">Remaining {pendingModules}</span>
+        <span className="text-3xl font-bold text-zinc-900">Completed: {completedModules}</span>
+        <span className="mt-2 text-lg font-semibold text-zinc-500">Remaining: {pendingModules}</span>
       </div>
     ) : (
       <span className="text-3xl font-bold text-zinc-900">No learning modules yet</span>
@@ -218,10 +218,10 @@ export function DashboardClient() {
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2">
         <ProgressCard title="Learning Progress" value={completionValue} />
         <ProgressCard title="Examination" value={quizValue} description={quizDescription} />
-        <ProgressCard
+        {/* <ProgressCard
           title="Certificate Status"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
           description={
@@ -237,7 +237,7 @@ export function DashboardClient() {
               </a>
             ) : undefined
           }
-        />
+        /> */}
       </section>
     </div>
   );
