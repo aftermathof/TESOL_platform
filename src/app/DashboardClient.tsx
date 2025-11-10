@@ -162,7 +162,7 @@ export function DashboardClient() {
 
   const quizValue: ReactNode =
     quizSnapshot.attempts === 0 ? (
-      <span className="text-lg font-semibold text-zinc-600">Assessment not started yet</span>
+      <span className="text-lg font-semibold text-zinc-600">Examination not started yet</span>
     ) : (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">
@@ -179,8 +179,8 @@ export function DashboardClient() {
 
   const quizDescription =
     quizSnapshot.attempts === 0
-      ? "Complete every learning module to unlock the assessment."
-      : `Latest assessment status: ${quizStatusLabel[quizSnapshot.latestStatus]}`;
+      ? "Complete every learning module to unlock the examination."
+      : `Latest examination status: ${quizStatusLabel[quizSnapshot.latestStatus]}`;
 
   return (
     <div className="grid gap-6">
@@ -216,7 +216,7 @@ export function DashboardClient() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <ProgressCard title="Learning Progress" value={completionValue} />
-        <ProgressCard title="Assessments" value={quizValue} description={quizDescription} />
+        <ProgressCard title="Examination" value={quizValue} description={quizDescription} />
         <ProgressCard
           title="Certificate Status"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
@@ -227,7 +227,7 @@ export function DashboardClient() {
                 href={progressState.data.certificateUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center rounded-full border border-sky-500 px-3 py-1 text-sm font-semibold text-sky-600 hover:bg-sky-50"
+                className="mt-3 inline-flex items-center rounded-full border border-sky-500 px-3 py-1 text-sm font-semibold text-sky-600 hover:bg-sky-50"
               >
                 Download PDF
               </a>

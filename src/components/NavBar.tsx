@@ -8,8 +8,8 @@ import { useAuth } from "@/components/AuthProvider";
 const links = [
   { href: "/", label: "Dashboard" },
   { href: "/learning", label: "Learning" },
-  { href: "/quiz", label: "Assessments" },
-  { href: "/certificates", label: "Certificates" },
+  { href: "/quiz", label: "Examination" },
+  { href: "/certificates", label: "Certificate" },
 ];
 
 export function NavBar() {
@@ -24,7 +24,7 @@ export function NavBar() {
             TESOL Platform
           </p>
           <h1 className="text-lg font-semibold text-zinc-900">
-            51Talk · Integrated Learning & Certification
+            Learning, Examination & Certification Platform
           </h1>
         </div>
         <div className="flex items-center gap-4">

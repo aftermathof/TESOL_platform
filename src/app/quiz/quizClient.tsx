@@ -120,7 +120,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
     let cancelled = false;
     async function loadModules() {
       if (!session?.user) {
-        setProgressMessage("Heads up: no active session detected. You can still start the assessment.");
+        setProgressMessage("Heads up: no active session detected. You can still start the examination.");
         setAllowStart(true);
         setProgressLoading(false);
         return;
@@ -139,13 +139,13 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         } else {
           const remaining = modules.filter((module) => !module.completed).length;
           setProgressMessage(
-            `${remaining} learning module(s) remain incomplete. Finish them before taking the assessment.`
+            `${remaining} learning module(s) remain incomplete. Finish them before taking the examination.`
           );
           setAllowStart(false);
         }
       } catch (error) {
         console.warn("[QuizClient] Failed to load modules:", error);
-        setProgressMessage("Learning progress is unavailable right now, but you can still start the assessment.");
+        setProgressMessage("Learning progress is unavailable right now, but you can still start the examination.");
         setAllowStart(true);
       } finally {
         if (!cancelled) {
@@ -187,7 +187,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
   if (!quiz) {
     return (
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 shadow-sm">
-        No assessment content is available yet.
+        No examination content is available yet.
       </section>
     );
   }
@@ -206,7 +206,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
               </p>
             ) : null}
             <p className="mt-4 text-base text-zinc-700">
-              This assessment includes {totalQuestions} questions covering single-choice and short-response tasks.
+              This examination includes {totalQuestions} questions covering single-choice and short-response tasks.
               You have 90 minutes; the system will auto-submit when the countdown ends.
             </p>
           </div>
@@ -225,7 +225,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
                 setShowIntroModal(true);
               }}
             >
-              Start assessment
+              Start examination
             </button>
             {progressLoading ? (
               <p className="text-xs text-zinc-400">Checking your learning progress...</p>
@@ -481,7 +481,7 @@ function IntroModal({
         </div>
         <div className="mt-4 space-y-3 text-sm text-zinc-600">
           <p>
-            Assessment title:
+            Examination title:
             <span className="font-semibold text-zinc-900">{quiz.title}</span>
           </p>
           <p>Number of questions: {totalQuestions}</p>
@@ -489,7 +489,7 @@ function IntroModal({
           <ul className="list-disc space-y-1 pl-5 text-xs text-zinc-500">
             <li>Keep a notebook handy and ensure a stable internet connection.</li>
             <li>Objective questions grade instantly; subjective items are scored by AI with admin review.</li>
-            <li>After submission you will return to the assessment hub where results and feedback appear.</li>
+            <li>After submission you will return to the examination hub where results and feedback appear.</li>
           </ul>
         </div>
         <div className="mt-6 flex justify-end gap-3">
@@ -640,7 +640,7 @@ function SubmissionReviewPanel({
         </p>
       )}
       <p className="mt-4 text-xs text-sky-600">
-        Results sync to your dashboard automatically. Retake the assessment anytime to improve.
+        Results sync to your dashboard automatically. Retake the examination anytime to improve.
       </p>
     </section>
   );

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TESOL 一体化平台",
+  title: "TESOL platform",
   description:
     "51Talk TESOL 学习、测验、Teaching Plan 与证书流程演示平台。",
 };
