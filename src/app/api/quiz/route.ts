@@ -106,8 +106,8 @@ export async function POST(request: Request) {
       isCorrect: answer.isCorrect ?? null,
     })),
     message: passed
-      ? "AI 已完成评分，恭喜通过测试！"
-      : "AI 已完成评分，本次未达到及格线，请继续努力。",
+      ? "AI completed the scoring—congratulations, you passed!"
+      : "AI completed the scoring, but this attempt did not reach the passing threshold. Please try again.",
   });
 }
 
