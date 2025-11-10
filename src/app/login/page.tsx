@@ -67,13 +67,35 @@ function AuthContainer({
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   const isSignIn = mode === "signin";
 
-  const handleForgotPassword = () => {
-    window.open("mailto:support@51talk.com");
+  const handleForgotPassword = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Enter your email so we can send the reset link.");
+      setNotice(null);
+      return;
+    }
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed);
+
+      if (resetError) {
+        throw resetError;
+      }
+      setNotice("Password reset email sent. Please check your inbox.");
+      setError(null);
+    } catch (cause) {
+      const message =
+        cause instanceof Error
+          ? cause.message
+          : "Failed to send password reset email. Please try again.";
+      setError(message);
+      setNotice(null);
+    }
   };
 
   const toggleMode = () =>
@@ -83,6 +105,7 @@ function AuthContainer({
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setNotice(null);
 
     try {
       if (isSignIn) {
@@ -247,6 +270,11 @@ function AuthContainer({
             {error && (
               <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-500">
                 {error}
+              </p>
+            )}
+            {notice && (
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-600">
+                {notice}
               </p>
             )}
 
