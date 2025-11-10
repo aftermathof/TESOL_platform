@@ -108,7 +108,7 @@ export function DashboardClient() {
   const pendingModules = Math.max(totalModules - completedModules, 0);
   const completionLabel =
     totalModules > 0
-      ? `Completed: ${completedModules} · Remaining: ${pendingModules}`
+      ? `Completed: ${completedModules} / Remaining: ${pendingModules}`
       : "No learning modules yet";
 
   const completionValue: ReactNode =
@@ -170,7 +170,7 @@ export function DashboardClient() {
     ) : (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">
-          Completed time: {quizSnapshot.attempts}
+          Number of completions: {quizSnapshot.attempts}
         </span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
           Highest score:{" "}
