@@ -33,7 +33,7 @@ export function LearningWorkspaceClient() {
       const message =
         cause instanceof Error
           ? cause.message
-          : "无法获取学习模块，请稍后再试。";
+          : "Unable to load learning modules. Please try again later.";
       setError(message);
     } finally {
       setLoading(false);
@@ -50,7 +50,7 @@ export function LearningWorkspaceClient() {
       const message =
         cause instanceof Error
           ? cause.message
-          : "记录完成状态时发生错误，请稍后再试。";
+          : "Failed to record completion. Please try again shortly.";
       setError(message);
     } finally {
       setCompletingModuleId(null);
@@ -62,7 +62,7 @@ export function LearningWorkspaceClient() {
       <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="flex flex-col items-center gap-3 text-sm text-zinc-500">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-200 border-t-sky-500" />
-          <span>正在加载学习模块…</span>
+          <span>Loading learning modules…</span>
         </div>
       </div>
     );
@@ -77,7 +77,7 @@ export function LearningWorkspaceClient() {
           onClick={() => void loadModules()}
           className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
         >
-          重新加载
+          Reload
         </button>
       </div>
     );
@@ -86,7 +86,7 @@ export function LearningWorkspaceClient() {
   if (modules.length === 0) {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center text-sm text-zinc-500 shadow-sm">
-        暂无学习模块内容，请联系管理员上传资料后再试。
+        No learning modules are available. Please contact an administrator to upload materials.
       </div>
     );
   }

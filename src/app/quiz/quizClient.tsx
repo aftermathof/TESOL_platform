@@ -83,7 +83,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
           passed: null,
           answers: [],
           aiSummary: null,
-          message: data.error ?? "提交失败，请检查答案格式后重试。",
+          message: data.error ?? "Submission failed. Please verify your answers and try again.",
         });
       } else {
         const data = (await response.json()) as SubmissionReceipt;
@@ -102,7 +102,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         passed: null,
         answers: [],
         aiSummary: null,
-        message: "网络异常，提交失败，请稍后重试。",
+        message: "Network error. Please try submitting again shortly.",
       });
     } finally {
       setSubmitting(false);
@@ -120,7 +120,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
     let cancelled = false;
     async function loadModules() {
       if (!session?.user) {
-        setProgressMessage("提示：未检测到登录状态，可直接开始测试。");
+        setProgressMessage("Heads up: no active session detected. You can still start the assessment.");
         setAllowStart(true);
         setProgressLoading(false);
         return;
@@ -131,7 +131,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         if (cancelled) return;
 
         if (modules.length === 0) {
-          setProgressMessage("当前账户尚未分配学习模块，如有疑问请联系管理员。");
+          setProgressMessage("No learning modules are assigned to this account. Please contact an administrator.");
           setAllowStart(true);
         } else if (modules.every((module) => module.completed)) {
           setProgressMessage(null);
@@ -139,13 +139,13 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
         } else {
           const remaining = modules.filter((module) => !module.completed).length;
           setProgressMessage(
-            `仍有 ${remaining} 个学习模块未完成，建议先完成学习再参加测验。`
+            `${remaining} learning module(s) remain incomplete. Finish them before taking the assessment.`
           );
           setAllowStart(false);
         }
       } catch (error) {
         console.warn("[QuizClient] Failed to load modules:", error);
-        setProgressMessage("暂时无法获取学习进度，您仍可直接开始测试。");
+        setProgressMessage("Learning progress is unavailable right now, but you can still start the assessment.");
         setAllowStart(true);
       } finally {
         if (!cancelled) {
@@ -187,7 +187,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
   if (!quiz) {
     return (
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 shadow-sm">
-        暂无可用测试题。
+        No assessment content is available yet.
       </section>
     );
   }
@@ -202,12 +202,12 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
             <h3 className="text-xl font-semibold text-zinc-900">{quiz.title}</h3>
             {quiz.duration ? (
               <p className="mt-1 text-sm text-zinc-500">
-                建议用时：{quiz.duration} 分钟
+                Recommended time: {quiz.duration} minutes
               </p>
             ) : null}
             <p className="mt-4 text-base text-zinc-700">
-              本次测验共 {totalQuestions} 道题，涵盖题型：单选、简答。
-              测试时长 90 分钟，将在倒计时结束后自动提交。
+              This assessment includes {totalQuestions} questions covering single-choice and short-response tasks.
+              You have 90 minutes; the system will auto-submit when the countdown ends.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 md:flex-row md:items-center">
@@ -225,10 +225,10 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
                 setShowIntroModal(true);
               }}
             >
-              开始测试
+              Start assessment
             </button>
             {progressLoading ? (
-              <p className="text-xs text-zinc-400">正在检查学习进度…</p>
+              <p className="text-xs text-zinc-400">Checking your learning progress...</p>
             ) : progressMessage ? (
               <p
                 className={clsx(
@@ -246,7 +246,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
           <header>
             <h3 className="text-xl font-semibold text-zinc-900">{quiz.title}</h3>
             <div className="mt-3 flex items-center justify-between rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-              <span>剩余时间</span>
+              <span>Time remaining</span>
               <span
                 className={clsx(
                   "font-mono text-lg font-semibold",
@@ -291,20 +291,20 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
                 }}
                 disabled={isSubmitting}
               >
-                退出并稍后再试
+                Exit and try later
               </button>
               <button
                 type="submit"
                 className="inline-flex items-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "提交中…" : "提交试卷"}
+                {isSubmitting ? "Submitting..." : "Submit answers"}
               </button>
             </div>
           </form>
           {autoSubmitting && (
             <p className="text-sm font-semibold text-red-500">
-              时间到，系统正在自动提交，请勿关闭页面…
+              Time is up. Submitting automatically—please keep this page open...
             </p>
           )}
         </section>
@@ -362,7 +362,7 @@ function QuestionItem({
   const hint = useMemo(() => {
     if (!question.options || question.options.length === 0) return null;
     if (question.type === "multiple") {
-      return "多选题：请选择所有符合的选项。";
+      return "Multiple choice: select every option that applies.";
     }
     return null;
   }, [question.options, question.type]);
@@ -370,7 +370,7 @@ function QuestionItem({
   return (
     <article className="rounded-2xl border border-zinc-100 bg-zinc-50/60 p-5">
       <p className="text-sm font-semibold text-zinc-500">
-        第 {index + 1} 题 · {typeLabel[question.type]}
+        Question {index + 1} · {typeLabel[question.type]}
       </p>
       <p className="mt-2 text-base text-zinc-800 whitespace-pre-line">
         {question.prompt}
@@ -430,7 +430,7 @@ function QuestionItem({
       {question.type === "blank" && (
         <input
           className="mt-4 w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-          placeholder="请输入答案"
+          placeholder="Enter your answer"
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -439,7 +439,7 @@ function QuestionItem({
       {question.type === "short" && (
         <textarea
           className="mt-4 min-h-[140px] w-full resize-y rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-          placeholder="请详细阐述你的想法…"
+          placeholder="Please explain your reasoning in detail..."
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -449,10 +449,10 @@ function QuestionItem({
 }
 
 const typeLabel: Record<QuizQuestion["type"], string> = {
-  single: "单选题",
-  multiple: "多选题",
-  blank: "填空题",
-  short: "简答题",
+  single: "Single Choice",
+  multiple: "Multiple Choice",
+  blank: "Fill in the Blank",
+  short: "Short Response",
 };
 
 function IntroModal({
@@ -470,26 +470,26 @@ function IntroModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 px-4">
       <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-xl">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-zinc-900">准备开始测试</h3>
+          <h3 className="text-lg font-semibold text-zinc-900">Ready to begin?</h3>
           <button
             type="button"
             onClick={onCancel}
             className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-200"
           >
-            关闭
+            Close
           </button>
         </div>
         <div className="mt-4 space-y-3 text-sm text-zinc-600">
           <p>
-            测试标题：
+            Assessment title:
             <span className="font-semibold text-zinc-900">{quiz.title}</span>
           </p>
-          <p>题目数量：{totalQuestions} 道</p>
-          <p>测验时长：90 分钟（倒计时结束将自动提交）。</p>
+          <p>Number of questions: {totalQuestions}</p>
+          <p>Duration: 90 minutes (auto-submit when the timer ends).</p>
           <ul className="list-disc space-y-1 pl-5 text-xs text-zinc-500">
-            <li>建议准备纸笔记录要点，确保网络稳定。</li>
-            <li>客观题即时判分，主观题将由 AI 评分并可供管理员复核。</li>
-            <li>提交后会返回测验主页，可在下方查看成绩与反馈。</li>
+            <li>Keep a notebook handy and ensure a stable internet connection.</li>
+            <li>Objective questions grade instantly; subjective items are scored by AI with admin review.</li>
+            <li>After submission you will return to the assessment hub where results and feedback appear.</li>
           </ul>
         </div>
         <div className="mt-6 flex justify-end gap-3">
@@ -498,14 +498,14 @@ function IntroModal({
             onClick={onCancel}
             className="rounded-full px-4 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
           >
-            取消
+            Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600"
           >
-            开始答题
+            Start answering
           </button>
         </div>
       </div>
@@ -525,9 +525,9 @@ function ConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
-        <h3 className="text-lg font-semibold text-zinc-900">确认提交</h3>
+        <h3 className="text-lg font-semibold text-zinc-900">Confirm submission</h3>
         <p className="mt-2 text-sm text-zinc-600">
-          提交后无法继续修改答卷，确定要提交吗？
+          You cannot modify answers after submitting. Continue?
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button
@@ -536,7 +536,7 @@ function ConfirmModal({
             className="rounded-full px-4 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-100"
             disabled={isSubmitting}
           >
-            返回检查
+            Go back
           </button>
           <button
             type="button"
@@ -544,7 +544,7 @@ function ConfirmModal({
             className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "提交中…" : "确认提交"}
+            {isSubmitting ? "Submitting..." : "Submit now"}
           </button>
         </div>
       </div>
@@ -563,10 +563,10 @@ function SubmissionReviewPanel({
 }) {
   const statusLabel =
     receipt.status === "approved"
-      ? "通过"
+      ? "Passed"
       : receipt.status === "rejected"
-      ? "未通过"
-      : "处理中";
+      ? "Failed"
+      : "Pending";
   const statusTone =
     receipt.status === "approved"
       ? "text-emerald-600"
@@ -579,11 +579,11 @@ function SubmissionReviewPanel({
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h4 className="text-lg font-semibold text-sky-900">
-            AI 评分结果：<span className={statusTone}>{statusLabel}</span>
+            AI evaluation: <span className={statusTone}>{statusLabel}</span>
           </h4>
           <p className="mt-1 text-sm text-sky-700">
-            总分 {formatScore(receipt.score)} / {formatScore(receipt.maxScore)} · 及格线{" "}
-            {formatScore(receipt.passThreshold)} 分
+            Total {formatScore(receipt.score)} / {formatScore(receipt.maxScore)} · Passing score{" "}
+            {formatScore(receipt.passThreshold)}
           </p>
         </div>
         <button
@@ -591,7 +591,7 @@ function SubmissionReviewPanel({
           onClick={onReset}
           className="inline-flex items-center rounded-full border border-sky-500 px-4 py-1 text-sm font-semibold text-sky-700 hover:bg-sky-500/10"
         >
-          收起答卷
+          Hide answer sheet
         </button>
       </div>
       <p className="mt-3 text-sm text-sky-700">{receipt.message}</p>
@@ -603,8 +603,8 @@ function SubmissionReviewPanel({
           const correctnessLabel =
             answer.isObjective && typeof answer.isCorrect === "boolean"
               ? answer.isCorrect
-                ? "判定：正确"
-                : "判定：错误"
+                ? "Judgment: correct"
+                : "Judgment: incorrect"
               : null;
 
           return (
@@ -616,17 +616,17 @@ function SubmissionReviewPanel({
                 {question.prompt}
               </p>
               <p className="mt-2 text-xs text-sky-700">
-                我的回答：{renderedResponse || "（未作答）"}
+                My answer: {renderedResponse || "(No response)"}
               </p>
               <p className="mt-2 text-xs text-sky-700">
-                得分：{formatScore(answer.awardedPoints)} / {formatScore(answer.maxPoints)}
+                Score: {formatScore(answer.awardedPoints)} / {formatScore(answer.maxPoints)}
                 {correctnessLabel ? ` · ${correctnessLabel}` : ""}
               </p>
               {answer.aiFeedback && (
                 <p className="mt-2 text-xs text-sky-700">
-                  AI 评价：{answer.aiFeedback}
+                  AI feedback: {answer.aiFeedback}
                   {typeof answer.aiScore === "number"
-                    ? `（自动评分：${answer.aiScore.toFixed(1)}）`
+                    ? `(Auto score: ${answer.aiScore.toFixed(1)})`
                     : ""}
                 </p>
               )}
@@ -636,11 +636,11 @@ function SubmissionReviewPanel({
       </ul>
       {receipt.aiSummary && (
         <p className="mt-4 rounded-xl border border-sky-100 bg-white/60 p-4 text-sm text-sky-800">
-          AI 总结：{receipt.aiSummary}
+          AI summary: {receipt.aiSummary}
         </p>
       )}
       <p className="mt-4 text-xs text-sky-600">
-        成绩已自动同步至仪表盘，如需提升得分可重新作答。
+        Results sync to your dashboard automatically. Retake the assessment anytime to improve.
       </p>
     </section>
   );

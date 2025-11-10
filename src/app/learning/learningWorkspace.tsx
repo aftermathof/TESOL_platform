@@ -1037,7 +1037,7 @@ export function LearningWorkspace({
 
           </p>
 
-          <h3 className="mt-2 text-lg font-semibold text-zinc-900">学习模块</h3>
+          <h3 className="mt-2 text-lg font-semibold text-zinc-900">Learning Modules</h3>
 
         </div>
 
@@ -1089,7 +1089,7 @@ export function LearningWorkspace({
 
               >
 
-                {module.completed ? "已完成" : "未完成"}
+                {module.completed ? "Completed" : "In progress"}
 
               </span>
 
@@ -1191,11 +1191,11 @@ export function LearningWorkspace({
 
                   ? moduleCompletionDate
 
-                    ? `已于 ${moduleCompletionDate} 完成该模块。`
+                    ? `Module completion recorded on ${moduleCompletionDate}.`
 
-                    : "已完成该模块。"
+                    : "Module already marked as complete."
 
-                  : "完成全部学习内容后，点击下方按钮即可标记为完成。"}
+                  : "Finish all learning content, then click the button below to mark it complete."}
 
               </div>
 
@@ -1216,14 +1216,10 @@ export function LearningWorkspace({
                   >
 
                     {moduleCompleted
-
-                      ? "已完成"
-
+                      ? "Completed"
                       : isCompletingModule
-
-                        ? "标记中…"
-
-                        : "标记为完成"}
+                        ? "Marking..."
+                        : "Mark as complete"}
 
                   </button>
 
@@ -1237,7 +1233,7 @@ export function LearningWorkspace({
 
         ) : (
 
-          <p className="p-8 text-sm text-zinc-500">请选择一个学习模块开始学习。</p>
+          <p className="p-8 text-sm text-zinc-500">Please select a learning module to begin.</p>
 
         )}
 
@@ -1345,7 +1341,7 @@ export function LearningWorkspace({
 
           <p className="text-xs font-semibold uppercase tracking-widest text-sky-500">
 
-            个人笔记
+            Personal Notes
 
           </p>
 
@@ -1359,7 +1355,7 @@ export function LearningWorkspace({
 
             <p className="rounded-xl bg-zinc-100/60 p-3 text-xs text-zinc-500">
 
-              正在同步你的高亮与笔记...
+              Syncing your highlights and notes...
 
             </p>
 
@@ -1367,7 +1363,7 @@ export function LearningWorkspace({
 
             <p className="rounded-xl bg-zinc-100/60 p-3 text-xs text-zinc-500">
 
-              选择一段文本并添加笔记以便回顾。
+              Highlight text and add a note so you can revisit it later.
 
             </p>
 
@@ -1395,7 +1391,7 @@ export function LearningWorkspace({
 
                   className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-xs text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
 
-                  aria-label="删除笔记"
+                  aria-label="Delete note"
 
                 >
 
@@ -1417,7 +1413,7 @@ export function LearningWorkspace({
 
                 <p className="mt-2 text-xs italic text-zinc-500">
 
-                  原文：{note.excerpt || ""}
+                  Excerpt: {note.excerpt || ""}
 
                 </p>
 
@@ -1539,7 +1535,7 @@ function NoteComposer({
     >
       <div className="flex items-center justify-between">
 
-        <h4 className="text-sm font-semibold text-zinc-800">添加笔记</h4>
+        <h4 className="text-sm font-semibold text-zinc-800">Add Note</h4>
 
         <button
 
@@ -1551,14 +1547,14 @@ function NoteComposer({
 
         >
 
-          取消
+          Cancel
 
         </button>
 
       </div>
 
       <p className="mt-2 text-xs text-zinc-500">
-        选中内容：
+        Selected text:
         {draft.selectionText.length > 120
           ? ` ${draft.selectionText.slice(0, 116)}...`
           : ` ${draft.selectionText}`}
@@ -1566,7 +1562,7 @@ function NoteComposer({
       <textarea
         ref={textareaRef}
         className="mt-3 h-32 w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        placeholder="写下你的想法..."
+        placeholder="Write down your thoughts..."
         value={draft.text}
         onChange={(event) => onChangeText(event.target.value)}
       />
@@ -1583,7 +1579,7 @@ function NoteComposer({
 
         >
 
-          取消
+          Cancel
 
         </button>
 
@@ -1601,7 +1597,7 @@ function NoteComposer({
 
         >
 
-          保存笔记
+          Save Note
 
         </button>
 

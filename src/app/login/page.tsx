@@ -24,7 +24,7 @@ function LoginPageSkeleton() {
     <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-200">
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 px-6 py-4 backdrop-blur">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white" />
-        <p className="text-sm text-slate-300">正在加载登录页面…</p>
+        <p className="text-sm text-slate-300">Loading sign-in experience…</p>
       </div>
     </div>
   );
@@ -95,7 +95,7 @@ function AuthContainer({
         }
       } else {
         if (!fullName.trim()) {
-          throw new Error("请填写姓名，以便生成证书");
+          throw new Error("Please provide your full name so we can issue a certificate.");
         }
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -148,7 +148,7 @@ function AuthContainer({
         return;
       }
       const message =
-        cause instanceof Error ? cause.message : "登录失败，请稍后再试";
+        cause instanceof Error ? cause.message : "Sign-in failed, please try again later.";
       setError(message);
     } finally {
       setSubmitting(false);
@@ -278,11 +278,11 @@ function AuthContainer({
             >
               {isSubmitting
                 ? isSignIn
-                  ? "正在登录..."
-                  : "正在创建..."
-                : isSignIn
-                  ? "登录"
-                  : "注册并登录"}
+            ? "Signing in..."
+            : "Creating account..."
+          : isSignIn
+          ? "Sign In"
+          : "Sign Up & Sign In"}
             </button>
           </form>
         </div>

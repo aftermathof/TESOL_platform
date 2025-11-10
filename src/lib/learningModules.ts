@@ -41,14 +41,14 @@ export type LearningModuleRecord = {
   completedAt?: string | null;
 };
 
-const DEFAULT_SECTION_TITLE = "未命名章节";
-const DEFAULT_MODULE_TITLE = "未命名模块";
+const DEFAULT_SECTION_TITLE = "Untitled Section";
+const DEFAULT_MODULE_TITLE = "Untitled Module";
 
 export async function fetchLearningModules(): Promise<LearningModuleRecord[]> {
   const supabase = getSupabaseBrowserClient();
   const { data: userResult } = await supabase.auth.getUser();
   if (!userResult?.user) {
-    throw new Error("未登录，无法获取学习模块。");
+    throw new Error("You must be signed in to load learning modules.");
   }
 
   const { data, error } = await supabase
@@ -116,7 +116,7 @@ export async function markModuleCompleted(moduleId: string) {
   const user = userResult?.user;
 
   if (!user) {
-    throw new Error("未登录，无法提交学习进度。");
+    throw new Error("You must be signed in to submit learning progress.");
   }
 
   const { error } = await supabase.from("module_progress").upsert(

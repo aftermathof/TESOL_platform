@@ -7,18 +7,20 @@ import type { ProgressSnapshot } from "@/data/mockData";
 import { useAuth } from "@/components/AuthProvider";
 
 const statusMap: Record<string, string> = {
-  not_eligible: "暂未满足条件",
-  generating: "可领取证书",
-  available: "证书已生成",
+  not_eligible: "Requirements not met yet",
+  generating: "Certificate is being generated",
+  available: "Certificate ready",
 };
 
 const quizStatusLabel: Record<"not_started" | "pending_review" | "approved" | "rejected", string> =
   {
-    not_started: "尚未测试",
-    pending_review: "待处理",
-    approved: "已通过",
-    rejected: "未通过",
+    not_started: "Not started",
+    pending_review: "Under review",
+    approved: "Approved",
+    rejected: "Rejected",
   };
+
+const ALL_COMPLETED_LABEL = "All modules completed";
 
 type AsyncState<T> = {
   data: T | null;
@@ -42,7 +44,7 @@ async function fetchProgress(accessToken?: string): Promise<ProgressSnapshot> {
     const message =
       typeof errorBody?.error === "string"
         ? errorBody.error
-        : `获取进度失败：${response.status}`;
+        : `Failed to load progress (status ${response.status})`;
     throw new Error(message);
   }
 
@@ -84,7 +86,9 @@ export function DashboardClient() {
       } catch (error) {
         if (cancelled) return;
         const message =
-          error instanceof Error ? error.message : "加载仪表盘数据时出现问题，请稍后再试。";
+          error instanceof Error
+            ? error.message
+            : "Unable to load dashboard data. Please try again.";
         setModulesState((prev) => ({ ...prev, loading: false, error: message }));
         setProgressState((prev) => ({ ...prev, loading: false, error: message }));
       }
@@ -100,17 +104,17 @@ export function DashboardClient() {
   const pendingModules = Math.max(totalModules - completedModules, 0);
   const completionLabel =
     totalModules > 0
-      ? `已完成 ${completedModules} / 未完成 ${pendingModules}`
-      : "暂无学习模块";
+      ? `Completed ${completedModules} · Remaining ${pendingModules}`
+      : "No learning modules yet";
 
   const completionValue: ReactNode =
     totalModules > 0 ? (
       <div className="flex flex-col leading-tight">
-        <span className="text-3xl font-bold text-zinc-900">已完成 {completedModules}</span>
-        <span className="mt-2 text-lg font-semibold text-zinc-500">未完成 {pendingModules}</span>
+        <span className="text-3xl font-bold text-zinc-900">Completed {completedModules}</span>
+        <span className="mt-2 text-lg font-semibold text-zinc-500">Remaining {pendingModules}</span>
       </div>
     ) : (
-      <span className="text-3xl font-bold text-zinc-900">暂无学习模块</span>
+      <span className="text-3xl font-bold text-zinc-900">No learning modules yet</span>
     );
 
   const nextModule = useMemo(() => {
@@ -122,7 +126,7 @@ export function DashboardClient() {
   const nextModuleDisplay = useMemo(() => {
     if (!nextModule) {
       if (modules.length > 0 && modules.every((module) => module.completed)) {
-        return "已全部完成";
+        return ALL_COMPLETED_LABEL;
       }
       return "";
     }
@@ -135,7 +139,7 @@ export function DashboardClient() {
       <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="flex flex-col items-center gap-3 text-sm text-zinc-500">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-200 border-t-sky-500" />
-          <span>正在加载仪表盘数据…</span>
+          <span>Loading dashboard data...</span>
         </div>
       </div>
     );
@@ -158,47 +162,52 @@ export function DashboardClient() {
 
   const quizValue: ReactNode =
     quizSnapshot.attempts === 0 ? (
-      <span className="text-lg font-semibold text-zinc-600">尚未完成测试</span>
+      <span className="text-lg font-semibold text-zinc-600">Assessment not started yet</span>
     ) : (
       <div className="flex flex-col leading-tight">
-        <span className="text-3xl font-bold text-zinc-900">完成 {quizSnapshot.attempts} 次</span>
+        <span className="text-3xl font-bold text-zinc-900">
+          Completed {quizSnapshot.attempts} {quizSnapshot.attempts === 1 ? "attempt" : "attempts"}
+        </span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
-          最高分：
+          Highest score:{" "}
           {quizSnapshot.highestFinalScore != null
-            ? `${quizSnapshot.highestFinalScore.toFixed(1)} 分`
-            : "暂无通过成绩"}
+            ? `${quizSnapshot.highestFinalScore.toFixed(1)}`
+            : "Not available yet"}
         </span>
       </div>
     );
 
   const quizDescription =
     quizSnapshot.attempts === 0
-      ? "完成学习后即可开启测试。"
-      : `最新一次测试：${quizStatusLabel[quizSnapshot.latestStatus]}`;
+      ? "Complete every learning module to unlock the assessment."
+      : `Latest assessment status: ${quizStatusLabel[quizSnapshot.latestStatus]}`;
+
   return (
     <div className="grid gap-6">
       <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h2 className="text-2xl font-semibold text-zinc-900">欢迎回来，继续你的 TESOL 学习旅程</h2>
-        {(nextModule || nextModuleDisplay === "已全部完成") && (
+        <h2 className="text-2xl font-semibold text-zinc-900">
+          Welcome back—continue your TESOL learning journey
+        </h2>
+        {(nextModule || nextModuleDisplay === ALL_COMPLETED_LABEL) && (
           <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-sky-100 bg-sky-50/60 p-6 text-sm text-sky-700 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold text-sky-900">
-                {nextModuleDisplay === "已全部完成"
-                  ? "学习状态：已全部完成"
-                  : `下一学习任务：${nextModuleDisplay}`}
+                {nextModuleDisplay === ALL_COMPLETED_LABEL
+                  ? "Status: all modules completed"
+                  : `Next learning task: ${nextModuleDisplay}`}
               </p>
-              <p>当前完成进度：{completionLabel}</p>
+              <p>Current progress: {completionLabel}</p>
             </div>
             {nextModule ? (
               <Link
                 href={`/learning?module=${encodeURIComponent(nextModule.id)}`}
                 className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-4 py-2 font-medium text-white hover:bg-[rgba(242, 244, 247, 1)] hover:text-white focus-visible:outline-none"
               >
-                <span className="text-white">前往学习模块</span>
+                <span className="text-white">Go to learning module</span>
               </Link>
             ) : (
               <div className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 font-medium text-white">
-                🎉 恭喜完成所有学习模块
+                🎉 Congrats on finishing every learning module!
               </div>
             )}
           </div>
@@ -206,10 +215,10 @@ export function DashboardClient() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <ProgressCard title="学习进度" value={completionValue} />
-        <ProgressCard title="测验情况" value={quizValue} description={quizDescription} />
+        <ProgressCard title="Learning Progress" value={completionValue} />
+        <ProgressCard title="Assessments" value={quizValue} description={quizDescription} />
         <ProgressCard
-          title="证书状态"
+          title="Certificate Status"
           value={statusMap[progressState.data?.certificateStatus ?? "not_eligible"]}
           description={
             progressState.data?.certificateStatus === "available" &&
@@ -220,7 +229,7 @@ export function DashboardClient() {
                 rel="noreferrer"
                 className="inline-flex items-center rounded-full border border-sky-500 px-3 py-1 text-sm font-semibold text-sky-600 hover:bg-sky-50"
               >
-                下载 PDF
+                Download PDF
               </a>
             ) : undefined
           }

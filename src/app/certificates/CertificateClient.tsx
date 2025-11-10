@@ -22,9 +22,9 @@ type CertificateResponse = {
 };
 
 const statusLabel: Record<CertificateInfo["status"], string> = {
-  not_eligible: "暂未满足条件",
-  eligible: "可领取证书",
-  ready: "证书已生成",
+  not_eligible: "Not eligible yet",
+  eligible: "Ready to claim",
+  ready: "Certificate issued",
 };
 
 export function CertificateClient() {
@@ -41,7 +41,11 @@ export function CertificateClient() {
   useEffect(() => {
     if (loading) return;
     if (!accessToken) {
-      setState({ data: null, loading: false, error: "请先登录再查看证书信息。" });
+      setState({
+        data: null,
+        loading: false,
+        error: "Please sign in to view your certificate.",
+      });
       return;
     }
     let cancelled = false;
@@ -53,7 +57,7 @@ export function CertificateClient() {
         });
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
-          throw new Error(body.error ?? "获取证书信息失败");
+          throw new Error(body.error ?? "Failed to load certificate info");
         }
         const payload = (await response.json()) as CertificateResponse;
         if (!cancelled) {
@@ -64,7 +68,7 @@ export function CertificateClient() {
           setState({
             data: null,
             loading: false,
-            error: error instanceof Error ? error.message : "获取证书信息失败",
+            error: error instanceof Error ? error.message : "Failed to load certificate info",
           });
         }
       }
@@ -81,10 +85,10 @@ export function CertificateClient() {
   const showPreview = certificate?.status === "ready" && Boolean(certificate.pdfUrl);
 
   const completionSummary = useMemo(() => {
-    if (!eligibility) return "尚未加载完成";
+    if (!eligibility) return "Loading…";
     const { completedModules, totalModules } = eligibility;
-    if (totalModules === 0) return "暂无学习模块记录";
-    return `学习模块：已完成 ${completedModules} / ${totalModules}`;
+    if (totalModules === 0) return "No learning modules recorded";
+    return `Learning modules: ${completedModules} completed / ${totalModules}`;
   }, [eligibility]);
 
   if (loading && state.loading) {
@@ -92,7 +96,7 @@ export function CertificateClient() {
       <section className="rounded-2xl border border-zinc-200 bg-white p-8 text-sm text-zinc-600 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-500" />
-          <span>正在加载证书信息...</span>
+          <span>Loading certificate information…</span>
         </div>
       </section>
     );
@@ -112,12 +116,12 @@ export function CertificateClient() {
 
   const highestScore =
     eligibility.highestScore != null
-      ? `${eligibility.highestScore.toFixed(1)} 分`
-      : "暂无成绩";
+      ? `${eligibility.highestScore.toFixed(1)} pts`
+      : "No score yet";
 
   const issuedAt = certificate.issuedAt
     ? new Date(certificate.issuedAt).toLocaleDateString()
-    : "待生成";
+    : "Pending";
 
   return (
     <section className="space-y-6 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -127,10 +131,10 @@ export function CertificateClient() {
             TESOL Certificate
           </p>
           <h3 className="mt-2 text-xl font-semibold text-zinc-900">
-            {certificate.fullName ?? "未命名学员"}
+            {certificate.fullName ?? "Learner"}
           </h3>
           <p className="text-sm text-zinc-600">
-            当前状态：{statusLabel[certificate.status]}
+            Status: {statusLabel[certificate.status]}
           </p>
         </div>
         <button
@@ -140,23 +144,23 @@ export function CertificateClient() {
           className="inline-flex items-center justify-center rounded-full bg-[rgb(0,102,255)] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[rgb(0,92,230)] disabled:cursor-not-allowed disabled:bg-zinc-300"
         >
           {certificate.status === "ready"
-            ? "证书已生成"
+            ? "Certificate ready"
             : claiming
-            ? "生成中..."
-            : "领取证书"}
+            ? "Generating…"
+            : "Claim certificate"}
         </button>
       </div>
 
       <div className="grid gap-4 text-sm text-zinc-700 md:grid-cols-2">
-        <InfoBlock label="证书编号" value={certificate.certificateNumber ?? "待生成"} />
-        <InfoBlock label="发放日期" value={issuedAt} />
-        <InfoBlock label="学习进度" value={completionSummary} />
-        <InfoBlock label="测验最高分" value={highestScore} />
+        <InfoBlock label="Certificate number" value={certificate.certificateNumber ?? "Pending"} />
+        <InfoBlock label="Issue date" value={issuedAt} />
+        <InfoBlock label="Learning progress" value={completionSummary} />
+        <InfoBlock label="Highest quiz score" value={highestScore} />
       </div>
 
       {showPreview ? (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-zinc-700">证书预览</p>
+          <p className="text-sm font-semibold text-zinc-700">Certificate preview</p>
           <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-zinc-200">
             <object
               key={certificate.pdfUrl ?? undefined}
@@ -165,16 +169,15 @@ export function CertificateClient() {
               className="h-full w-full"
             >
               <p className="p-4 text-sm text-zinc-600">
-                浏览器不支持内嵌预览，请{" "}
+                This browser cannot embed the preview.{" "}
                 <a
                   href={certificate.pdfUrl ?? "#"}
                   target="_blank"
                   rel="noreferrer"
                   className="text-sky-600 underline"
                 >
-                  点击这里下载
+                  Click here to download.
                 </a>
-                。
               </p>
             </object>
           </div>
@@ -185,13 +188,13 @@ export function CertificateClient() {
               rel="noreferrer"
               className="inline-flex items-center rounded-full border border-sky-500 px-4 py-2 font-semibold text-sky-600 hover:bg-sky-50"
             >
-              下载 PDF
+              Download PDF
             </a>
           </div>
         </div>
       ) : (
         <p className="rounded-xl bg-zinc-50 p-4 text-sm text-zinc-600">
-          证书生成后将提供 PDF 预览与下载链接。
+          A preview and download link will appear once your certificate is generated.
         </p>
       )}
     </section>
@@ -226,7 +229,7 @@ async function handleClaim(
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.error ?? "生成证书失败");
+      throw new Error(body.error ?? "Failed to generate certificate");
     }
     await response.json();
     const refreshed = await fetch("/api/certificate", {
@@ -234,14 +237,14 @@ async function handleClaim(
     });
     if (!refreshed.ok) {
       const body = await refreshed.json().catch(() => ({}));
-      throw new Error(body.error ?? "刷新证书信息失败");
+      throw new Error(body.error ?? "Failed to refresh certificate data");
     }
     const payload = (await refreshed.json()) as CertificateResponse;
     setState({ data: payload, loading: false, error: null });
   } catch (error) {
     setState((prev) => ({
       ...prev,
-      error: error instanceof Error ? error.message : "生成证书失败",
+      error: error instanceof Error ? error.message : "Failed to generate certificate",
     }));
   } finally {
     setClaiming(false);

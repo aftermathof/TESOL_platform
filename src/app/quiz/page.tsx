@@ -10,11 +10,9 @@ export default async function QuizPage() {
   return (
     <div className="grid gap-6">
       <header className="flex flex-col gap-2">
-        <h2 className="text-2xl font-semibold text-zinc-900">
-          测验中心
-        </h2>
+        <h2 className="text-2xl font-semibold text-zinc-900">Assessment Center</h2>
         <p className="text-sm text-zinc-500">
-          完成全部学习内容后即可开启测试。
+          Finish every learning module to unlock the assessment.
         </p>
       </header>
       <QuizClient quiz={quiz} />

@@ -6,10 +6,10 @@ import clsx from "clsx";
 import { useAuth } from "@/components/AuthProvider";
 
 const links = [
-  { href: "/", label: "个人仪表盘" },
-  { href: "/learning", label: "学习模块" },
-  { href: "/quiz", label: "测验模块" },
-  { href: "/certificates", label: "证书" },
+  { href: "/", label: "Dashboard" },
+  { href: "/learning", label: "Learning" },
+  { href: "/quiz", label: "Assessments" },
+  { href: "/certificates", label: "Certificates" },
 ];
 
 export function NavBar() {
@@ -24,7 +24,7 @@ export function NavBar() {
             TESOL Platform
           </p>
           <h1 className="text-lg font-semibold text-zinc-900">
-            51Talk 外教学习与考证一体化平台
+            51Talk · Integrated Learning & Certification
           </h1>
         </div>
         <div className="flex items-center gap-4">
@@ -72,7 +72,7 @@ export function NavBar() {
                 onClick={() => void signOut()}
                 className="rounded-full bg-zinc-900 px-3 py-1 text-[10px] font-semibold text-white transition hover:bg-zinc-700"
               >
-                退出
+                Sign out
               </button>
             </div>
           )}
