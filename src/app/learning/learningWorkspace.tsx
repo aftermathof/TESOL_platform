@@ -1345,7 +1345,7 @@ export function LearningWorkspace({
 
           </p>
 
-          <h3 className="mt-2 text-lg font-semibold text-zinc-900">Insights</h3>
+          <h3 className="mt-2 text-lg font-semibold text-zinc-900">Notes</h3>
 
         </div>
 

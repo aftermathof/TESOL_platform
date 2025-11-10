@@ -207,6 +207,7 @@ export function QuizClient({ quiz }: { quiz: Quiz | null }) {
             ) : null}
             <p className="mt-4 text-base text-zinc-700">
               This examination includes {totalQuestions} questions covering single-choice and short-response tasks.
+              <br />
               You have 90 minutes; the system will auto-submit when the countdown ends.
             </p>
           </div>
@@ -486,11 +487,6 @@ function IntroModal({
           </p>
           <p>Number of questions: {totalQuestions}</p>
           <p>Duration: 90 minutes (auto-submit when the timer ends).</p>
-          <ul className="list-disc space-y-1 pl-5 text-xs text-zinc-500">
-            <li>Keep a notebook handy and ensure a stable internet connection.</li>
-            <li>Objective questions grade instantly; subjective items are scored by AI with admin review.</li>
-            <li>After submission you will return to the examination hub where results and feedback appear.</li>
-          </ul>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button

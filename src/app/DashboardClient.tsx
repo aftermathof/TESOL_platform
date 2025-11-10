@@ -166,7 +166,7 @@ export function DashboardClient() {
     ) : (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">
-          Completed {quizSnapshot.attempts} {quizSnapshot.attempts === 1 ? "attempt" : "attempts"}
+          Completed {quizSnapshot.attempts} {quizSnapshot.attempts === 1 ? "time" : "times"}
         </span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
           Highest score:{" "}
