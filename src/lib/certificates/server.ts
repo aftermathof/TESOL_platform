@@ -79,16 +79,25 @@ export async function getCertificateSnapshot(userId: string): Promise<{
     ? "eligible"
     : "not_eligible";
 
-  return {
-    certificate: {
-      status,
-      certificateNumber: record?.certificate_number ?? null,
-      fullName: record?.full_name ?? fullName,
-      issuedAt: record?.issued_at ?? null,
-      pdfUrl: record?.pdf_url ?? null,
-    },
-    eligibility,
+  const certificate: CertificateInfo = {
+    status,
+    certificateNumber: record?.certificate_number ?? null,
+    fullName: record?.full_name ?? fullName,
+    issuedAt: record?.issued_at ?? null,
+    pdfUrl: record?.pdf_url ?? null,
   };
+
+  if (eligibility.eligible && certificate.status !== "ready") {
+    try {
+      const generated = await claimCertificate(userId);
+      return { certificate: generated, eligibility };
+    } catch (error) {
+      console.error("[certificate] Auto-generation failed:", error);
+      return { certificate, eligibility };
+    }
+  }
+
+  return { certificate, eligibility };
 }
 
 export async function claimCertificate(userId: string): Promise<CertificateInfo> {

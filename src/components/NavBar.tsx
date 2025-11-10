@@ -9,7 +9,6 @@ const links = [
   { href: "/", label: "Dashboard" },
   { href: "/learning", label: "Learning" },
   { href: "/quiz", label: "Examination" },
-  { href: "/certificates", label: "Certificate" },
 ];
 
 export function NavBar() {
