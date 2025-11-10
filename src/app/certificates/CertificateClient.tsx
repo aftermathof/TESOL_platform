@@ -147,7 +147,7 @@ export function CertificateClient() {
             ? "Certificate ready"
             : claiming
             ? "Generating…"
-            : "Claim certificate"}
+            : "Generate certificate"}
         </button>
       </div>
 

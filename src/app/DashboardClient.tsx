@@ -21,7 +21,7 @@ const quizStatusLabel: Record<"not_started" | "pending_review" | "approved" | "r
     not_started: "Not started",
     pending_review: "Under review",
     approved: "Approved",
-    rejected: "Rejected",
+    rejected: "Failed",
   };
 
 const ALL_COMPLETED_LABEL = "All modules completed";
@@ -178,7 +178,7 @@ export function DashboardClient() {
     ) : (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">
-          Completed {quizSnapshot.attempts === 1 ? "time" : "times"}: {quizSnapshot.attempts}
+          Completed time: {quizSnapshot.attempts}
         </span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
           Highest score:{" "}

@@ -618,23 +618,10 @@ function SubmissionReviewPanel({
                 Score: {formatScore(answer.awardedPoints)} / {formatScore(answer.maxPoints)}
                 {correctnessLabel ? ` · ${correctnessLabel}` : ""}
               </p>
-              {answer.aiFeedback && (
-                <p className="mt-2 text-xs text-sky-700">
-                  AI feedback: {answer.aiFeedback}
-                  {typeof answer.aiScore === "number"
-                    ? `(Auto score: ${answer.aiScore.toFixed(1)})`
-                    : ""}
-                </p>
-              )}
             </li>
           );
         })}
       </ul>
-      {receipt.aiSummary && (
-        <p className="mt-4 rounded-xl border border-sky-100 bg-white/60 p-4 text-sm text-sky-800">
-          AI summary: {receipt.aiSummary}
-        </p>
-      )}
       <p className="mt-4 text-xs text-sky-600">
         Results sync to your dashboard automatically. Retake the examination anytime to improve.
       </p>
