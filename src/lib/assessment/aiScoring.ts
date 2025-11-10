@@ -79,9 +79,11 @@ export async function scoreSubjectiveAnswer(params: {
       return { aiScore: null, aiFeedback: "AI 没有返回评分结果" };
     }
 
+    const payload = extractJsonPayload(content);
+
     let parsed: { score?: number; feedback?: string } | null = null;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(payload);
     } catch {
       return { aiScore: null, aiFeedback: content.slice(0, 160) };
     }
@@ -98,8 +100,22 @@ export async function scoreSubjectiveAnswer(params: {
     return {
       aiScore: null,
       aiFeedback: error instanceof Error ? error.message : String(error),
-    };
+  };
+}
+
+function extractJsonPayload(content: string): string {
+  const trimmed = content.trim();
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch?.[1]) {
+    return fenceMatch[1].trim();
   }
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && start < end) {
+    return trimmed.slice(start, end + 1).trim();
+  }
+  return trimmed;
+}
 }
 
 function buildPrompt(params: {

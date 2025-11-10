@@ -6,9 +6,13 @@ import { fetchLearningModules, type LearningModuleRecord } from "@/lib/learningM
 import type { ProgressSnapshot } from "@/data/mockData";
 import { useAuth } from "@/components/AuthProvider";
 
-const statusMap: Record<string, string> = {
+const statusMap: Record<string, ReactNode> = {
   not_eligible: "Requirements not met yet",
-  generating: "Certificate is being generated",
+  generating: (
+    <Link href="/certificates" className="text-sky-600 underline hover:text-sky-700">
+      You can obtain the certificate now.
+    </Link>
+  ),
   available: "Certificate ready",
 };
 
@@ -174,7 +178,7 @@ export function DashboardClient() {
     ) : (
       <div className="flex flex-col leading-tight">
         <span className="text-3xl font-bold text-zinc-900">
-          Completed {quizSnapshot.attempts} {quizSnapshot.attempts === 1 ? "time" : "times"}
+          Completed {quizSnapshot.attempts === 1 ? "time" : "times"}: {quizSnapshot.attempts}
         </span>
         <span className="mt-2 text-lg font-semibold text-zinc-500">
           Highest score:{" "}
