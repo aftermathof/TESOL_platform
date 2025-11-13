@@ -45,7 +45,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
       },
       questions: mockQuiz.questions.map((question) => ({
         id: question.id,
-        type: question.type === "text" ? "short" : question.type,
+        type: question.type,
         prompt: question.prompt,
         options: question.options,
         answer: question.answer,
@@ -75,7 +75,7 @@ export async function getActiveQuiz(): Promise<QuizRecordWithQuestions> {
       },
       questions: mockQuiz.questions.map((question) => ({
         id: question.id,
-        type: question.type === "text" ? "short" : question.type,
+        type: question.type,
         prompt: question.prompt,
         options: question.options,
         answer: question.answer,
