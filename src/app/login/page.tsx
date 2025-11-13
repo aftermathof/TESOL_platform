@@ -31,11 +31,26 @@ function LoginPageSkeleton() {
 }
 
 function LoginPageContent() {
-  const supabase = getSupabaseBrowserClient();
+  const [supabaseClient, setSupabaseClient] =
+    useState<ReturnType<typeof getSupabaseBrowserClient> | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const { session, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
+
+  useEffect(() => {
+    try {
+      setSupabaseClient(getSupabaseBrowserClient());
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Supabase client is not configured.";
+      setConfigError(message);
+      console.error("[login] Supabase configuration error:", error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && session) {
@@ -43,13 +58,21 @@ function LoginPageContent() {
     }
   }, [loading, session, router, redirect]);
 
+  if (configError) {
+    return <SupabaseConfigError message={configError} />;
+  }
+
+  if (!supabaseClient) {
+    return <LoginPageSkeleton />;
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-white text-slate-900">
       <div className="absolute left-6 top-6">
         <Image src="/logo.png" alt="51Talk logo" width={110} height={32} priority />
       </div>
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-slate-300 via-blue-500 to-slate-300 opacity-70" />
-      <AuthContainer redirect={redirect} supabase={supabase} />
+      <AuthContainer redirect={redirect} supabase={supabaseClient} />
     </div>
   );
 }
@@ -314,6 +337,25 @@ function AuthContainer({
             </button>
           </form>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SupabaseConfigError({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-200">
+      <div className="max-w-lg rounded-2xl border border-white/10 px-8 py-6 text-center backdrop-blur">
+        <h2 className="text-xl font-semibold text-white">Configuration Required</h2>
+        <p className="mt-3 text-sm text-slate-200/80">
+          {message}
+        </p>
+        <p className="mt-3 text-sm text-slate-200/80">
+          Please set <code className="text-white">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+          <code className="text-white">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment
+          variables (e.g., <code className="text-white">.env.local</code> or Vercel project settings)
+          and redeploy.
+        </p>
       </div>
     </div>
   );
